@@ -3,10 +3,10 @@ import { useQuery } from "@tanstack/react-query";
 import { AppHeader } from "@/components/AppHeader";
 import { CuratedFeedSection } from "@/components/CuratedFeedSection";
 import { TopFivePreviewSection } from "@/components/TopFivePreviewSection";
-import { KeywordFilterSection } from "@/components/KeywordFilterSection";
 import { PodcastSection } from "@/components/PodcastSection";
 import { Button } from "@/components/ui/button";
 import { Settings } from "lucide-react";
+import { Link } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
 import type { FilterPreview } from "@shared/schema";
 
@@ -46,18 +46,19 @@ export default function Home() {
         <CuratedFeedSection />
         <TopFivePreviewSection />
         <PodcastSection />
-        <KeywordFilterSection />
       </main>
 
       {/* Floating Action Button */}
       <div className="fixed bottom-6 right-6 z-40">
-        <Button
-          size="lg"
-          className="w-14 h-14 rounded-full shadow-lg hover:shadow-xl transition-all duration-300"
-          data-testid="button-quick-settings"
-        >
-          <Settings className="h-5 w-5" />
-        </Button>
+        <Link href="/settings">
+          <Button
+            size="lg"
+            className="w-14 h-14 rounded-full shadow-lg hover:shadow-xl transition-all duration-300"
+            data-testid="button-quick-settings"
+          >
+            <Settings className="h-5 w-5" />
+          </Button>
+        </Link>
       </div>
     </div>
   );

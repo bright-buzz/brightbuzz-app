@@ -69,7 +69,7 @@ export class MemStorage implements IStorage {
     const article: Article = { 
       ...insertArticle,
       content: insertArticle.content || null,
-      keywords: insertArticle.keywords || [],
+      keywords: (insertArticle.keywords as string[]) || [],
       id,
       views: 0,
     };
@@ -140,6 +140,7 @@ export class MemStorage implements IStorage {
     const podcast: Podcast = { 
       ...insertPodcast,
       audioUrl: insertPodcast.audioUrl || null,
+      articleIds: (insertPodcast.articleIds as string[]) || [],
       id,
     };
     this.podcasts.set(id, podcast);

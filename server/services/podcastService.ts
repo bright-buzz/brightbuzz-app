@@ -162,7 +162,7 @@ Format the script with clear sections: [INTRO], [STORY 1], [STORY 2], etc., [OUT
       // Get articles by IDs
       const allArticles = await storage.getArticles();
       const podcastArticles = allArticles.filter(article => 
-        existingPodcast.articleIds.includes(article.id)
+        (existingPodcast.articleIds || []).includes(article.id)
       );
 
       // Regenerate script and audio

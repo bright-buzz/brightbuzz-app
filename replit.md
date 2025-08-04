@@ -4,7 +4,7 @@
 
 NewsFlow is an AI-powered news curation platform designed specifically for young professionals to reduce information anxiety. The application intelligently filters and curates news content based on sentiment analysis and user-defined keywords, presenting only positive, career-focused content while filtering out anxiety-inducing topics like layoffs and economic downturns.
 
-The platform features real-time news fetching from external APIs, AI-powered sentiment analysis using OpenAI's GPT-4o model, customizable keyword filtering, and a modern React-based interface with curated feeds and trending articles.
+The platform features real-time news fetching from external APIs, AI-powered sentiment analysis using OpenAI's GPT-4o model, customizable keyword filtering, automated daily podcast generation, and a modern React-based interface with curated feeds, trending articles, and comprehensive settings management.
 
 ## User Preferences
 
@@ -17,7 +17,7 @@ Preferred communication style: Simple, everyday language.
 - **UI Library**: Shadcn/ui components built on Radix UI primitives for accessibility
 - **Styling**: Tailwind CSS with CSS variables for theming support
 - **State Management**: TanStack Query (React Query) for server state management
-- **Routing**: Wouter for lightweight client-side routing
+- **Routing**: Wouter for lightweight client-side routing with home and settings pages
 - **Form Handling**: React Hook Form with Zod validation
 
 ### Backend Architecture
@@ -37,12 +37,14 @@ Preferred communication style: Simple, everyday language.
 - **Articles Table**: Stores news content with sentiment scores, keywords, view counts, and curation flags
 - **Keywords Table**: Manages blocked and prioritized keywords for content filtering
 - **User Preferences Table**: Stores sentiment threshold and real-time filtering settings
+- **Podcasts Table**: Stores generated daily podcast metadata, transcripts, and associated article references
 
 ### AI Integration Architecture
 - **Sentiment Analysis**: OpenAI GPT-4o model analyzes article sentiment with confidence scoring
 - **Content Summarization**: AI-generated summaries optimized for professional audiences
 - **Keyword Extraction**: Automatic keyword identification for content categorization
 - **Content Curation**: AI-driven article selection based on positivity and professional relevance
+- **Podcast Generation**: Automated daily 5-10 minute podcast creation with AI-generated scripts and simulated TTS
 
 ### External Dependencies
 - **News Data**: NewsAPI.org for real-time news content across multiple professional topics
@@ -63,3 +65,9 @@ The application implements a multi-layered filtering approach:
 - **Featured Content**: AI selects representative articles for highlighted display
 - **Personalization**: User preferences influence content selection and ranking
 - **Freshness Balance**: System balances recent content with high-quality older articles
+- **Daily Podcast Curation**: AI selects and sequences 5-8 articles for optimal podcast flow and professional relevance
+
+### Application Structure
+- **Home Page**: Features curated feed, top 5 articles preview, and daily podcast generation
+- **Settings Page**: Comprehensive filter management, keyword editing, sentiment thresholds, and live filter preview
+- **Clean Interface**: Streamlined main experience with detailed controls moved to dedicated settings area

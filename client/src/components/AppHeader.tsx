@@ -1,5 +1,6 @@
 import { Newspaper, Shield, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Link } from "wouter";
 
 interface AppHeaderProps {
   filteredCount: number;
@@ -28,13 +29,15 @@ export function AppHeader({ filteredCount }: AppHeaderProps) {
               </span>
             </div>
             
-            <Button 
-              className="bg-primary hover:bg-blue-700"
-              data-testid="button-settings"
-            >
-              <Settings className="text-sm mr-2" />
-              <span className="hidden sm:block">Settings</span>
-            </Button>
+            <Link href="/settings">
+              <Button 
+                className="bg-primary hover:bg-blue-700"
+                data-testid="button-settings"
+              >
+                <Settings className="text-sm mr-2" />
+                <span className="hidden sm:block">Settings</span>
+              </Button>
+            </Link>
           </div>
         </div>
       </div>

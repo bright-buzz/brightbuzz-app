@@ -177,7 +177,7 @@ export function PodcastSection() {
                         <Clock className="h-3 w-3" />
                         <span>{formatDuration(podcast.duration)}</span>
                       </span>
-                      <span>{podcast.articleIds.length} articles</span>
+                      <span>{(podcast.articleIds || []).length} articles</span>
                     </div>
                   </div>
                   {podcast.isProcessing && (
@@ -193,7 +193,7 @@ export function PodcastSection() {
                     <Button
                       size="sm"
                       className="w-10 h-10 rounded-full bg-purple-600 hover:bg-purple-700"
-                      disabled={!podcast.audioUrl || podcast.isProcessing}
+                      disabled={!podcast.audioUrl || (podcast.isProcessing || false)}
                       data-testid={`button-play-${podcast.id}`}
                     >
                       <Play className="h-4 w-4" />
@@ -210,7 +210,7 @@ export function PodcastSection() {
                     <Button
                       size="sm"
                       variant="ghost"
-                      disabled={!podcast.audioUrl || podcast.isProcessing}
+                      disabled={!podcast.audioUrl || (podcast.isProcessing || false)}
                       data-testid={`button-download-${podcast.id}`}
                     >
                       <Download className="h-4 w-4" />
