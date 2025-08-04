@@ -68,6 +68,6 @@ The application implements a multi-layered filtering approach:
 - **Daily Podcast Curation**: AI selects and sequences 5-8 articles for optimal podcast flow and professional relevance
 
 ### Application Structure
-- **Home Page**: Features curated feed, top 5 articles preview, and daily podcast generation
+- **Home Page**: Features filter effectiveness metrics, curated feed, top 5 articles preview, and daily podcast generation
 - **Settings Page**: Comprehensive filter management, keyword editing, sentiment thresholds, and live filter preview
-- **Clean Interface**: Streamlined main experience with detailed controls moved to dedicated settings area
+- **Clean Interface**: Key metrics visible on main page with detailed controls moved to dedicated settings area

@@ -337,35 +337,14 @@ export default function Settings() {
               </Card>
             </div>
             
-            {/* Filter Statistics */}
+            {/* Quick Stats Summary */}
             <Card className="bg-slate-50 p-4">
-              <h4 className="text-sm font-medium text-slate-700 mb-3">Filter Effectiveness</h4>
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-center">
-                <Card className="bg-white p-3">
-                  <div className="text-2xl font-bold text-accent" data-testid="stat-filtered">
-                    {filterPreview?.stats?.filteredCount || 0}
-                  </div>
-                  <div className="text-xs text-slate-600">Articles Filtered</div>
-                </Card>
-                <Card className="bg-white p-3">
-                  <div className="text-2xl font-bold text-secondary" data-testid="stat-passed">
-                    {filterPreview?.stats?.passedCount || 0}
-                  </div>
-                  <div className="text-xs text-slate-600">Articles Passed</div>
-                </Card>
-                <Card className="bg-white p-3">
-                  <div className="text-2xl font-bold text-primary" data-testid="stat-avg-sentiment">
-                    {Math.round((filterPreview?.stats?.avgSentiment || 0) * 100)}%
-                  </div>
-                  <div className="text-xs text-slate-600">Avg Sentiment</div>
-                </Card>
-                <Card className="bg-white p-3">
-                  <div className="text-2xl font-bold text-warning" data-testid="stat-anxiety-reduction">
-                    {filterPreview?.stats?.anxietyReduction || 0}%
-                  </div>
-                  <div className="text-xs text-slate-600">Anxiety Reduction</div>
-                </Card>
-              </div>
+              <h4 className="text-sm font-medium text-slate-700 mb-3">Current Filter Impact</h4>
+              <p className="text-sm text-slate-600">
+                Your current settings are filtering <span className="font-semibold text-red-600">{filterPreview?.stats?.filteredCount || 0}</span> of <span className="font-semibold">{filterPreview?.stats?.totalArticles || 0}</span> articles, 
+                maintaining an average sentiment of <span className="font-semibold text-blue-600">{Math.round((filterPreview?.stats?.avgSentiment || 0) * 100)}%</span> 
+                and reducing anxiety-inducing content by <span className="font-semibold text-purple-600">{filterPreview?.stats?.anxietyReduction || 0}%</span>.
+              </p>
             </Card>
           </div>
         </section>
