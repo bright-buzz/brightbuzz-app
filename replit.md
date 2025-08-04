@@ -10,6 +10,14 @@ The platform features real-time news fetching from external APIs, AI-powered sen
 
 Preferred communication style: Simple, everyday language.
 
+## Recent Changes
+
+- **RSS Feed Integration (August 2025)**: Added comprehensive RSS feed support as primary news source
+  - Integrated feeds from TechCrunch, The Verge, Bloomberg, Reuters, Harvard Business Review, and others
+  - RSS parsing with content cleaning and categorization
+  - Fallback to NewsAPI when RSS content is insufficient
+  - Graceful handling of AI analysis failures with keyword extraction fallbacks
+
 ## System Architecture
 
 ### Frontend Architecture
@@ -47,7 +55,8 @@ Preferred communication style: Simple, everyday language.
 - **Podcast Generation**: Automated daily 5-10 minute podcast creation with AI-generated scripts and simulated TTS
 
 ### External Dependencies
-- **News Data**: NewsAPI.org for real-time news content across multiple professional topics
+- **News Data**: RSS feeds from major tech and business publications (TechCrunch, The Verge, Bloomberg, Reuters, etc.)
+- **News Fallback**: NewsAPI.org as secondary source for additional content when needed
 - **AI Services**: OpenAI API for sentiment analysis, summarization, and content curation
 - **Database**: Neon Database for serverless PostgreSQL hosting
 - **UI Components**: Radix UI primitives for accessible component foundations

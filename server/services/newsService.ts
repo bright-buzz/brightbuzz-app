@@ -1,5 +1,6 @@
 import { storage } from "../storage";
 import { analyzeSentiment, summarizeArticle, extractKeywords, curateArticles } from "./aiService";
+import { RSSService } from "./rssService";
 import type { InsertArticle } from "@shared/schema";
 
 const NEWS_API_KEY = process.env.NEWS_API_KEY || process.env.VITE_NEWS_API_KEY || "default_key";
@@ -17,6 +18,11 @@ interface NewsAPIArticle {
 export class NewsService {
   private lastFetchTime: number = 0;
   private readonly FETCH_INTERVAL = 15 * 60 * 1000; // 15 minutes
+  private rssService: RSSService;
+
+  constructor() {
+    this.rssService = new RSSService();
+  }
 
   async fetchLatestNews(): Promise<void> {
     const now = Date.now();
@@ -25,7 +31,37 @@ export class NewsService {
     }
 
     try {
-      // Fetch from multiple endpoints to get diverse content
+      console.log("Fetching latest news from RSS feeds...");
+      
+      // Fetch from RSS feeds (primary source)
+      const rssArticles = await this.rssService.getLatestArticles();
+      console.log(`Retrieved ${rssArticles.length} articles from RSS feeds`);
+
+      // Process RSS articles with AI analysis
+      const processedArticles = await this.processRSSArticles(rssArticles);
+      
+      // Store articles
+      for (const article of processedArticles) {
+        await storage.createArticle(article);
+      }
+
+      // Fallback to NewsAPI if RSS didn't provide enough content
+      if (processedArticles.length < 10) {
+        console.log("RSS feeds provided limited content, supplementing with NewsAPI...");
+        await this.fetchFromNewsAPI();
+      }
+
+      // Run AI curation
+      await this.runAICuration();
+
+      this.lastFetchTime = now;
+    } catch (error) {
+      console.error("Failed to fetch news:", error);
+    }
+  }
+
+  private async fetchFromNewsAPI(): Promise<void> {
+    try {
       const queries = [
         'artificial intelligence career',
         'remote work technology',
@@ -49,38 +85,95 @@ export class NewsService {
         }
       }
 
-      // Process and store articles
-      const processedArticles = await this.processArticles(allArticles);
+      // Process and store NewsAPI articles
+      const processedArticles = await this.processNewsAPIArticles(allArticles);
       
-      // Store articles
       for (const article of processedArticles) {
         await storage.createArticle(article);
       }
-
-      // Run AI curation
-      await this.runAICuration();
-
-      this.lastFetchTime = now;
     } catch (error) {
-      console.error("Failed to fetch news:", error);
+      console.error("Failed to fetch from NewsAPI:", error);
     }
   }
 
-  private async processArticles(articles: NewsAPIArticle[]): Promise<InsertArticle[]> {
+  private async processRSSArticles(articles: Omit<InsertArticle, 'id' | 'views' | 'sentiment' | 'keywords' | 'isCurated' | 'isTopFive'>[]): Promise<InsertArticle[]> {
+    const processed: InsertArticle[] = [];
+
+    for (const article of articles) {
+      if (!article.title || !article.summary || !article.content) continue;
+
+      try {
+        // Use fallback values if AI analysis fails
+        let sentiment = 0.7; // Default neutral-positive sentiment
+        let keywords: string[] = [];
+        let summary = article.summary;
+
+        try {
+          // Analyze sentiment
+          const sentimentResult = await analyzeSentiment(article.title + " " + article.summary);
+          sentiment = sentimentResult.rating;
+          
+          // Extract keywords
+          keywords = await extractKeywords(article.title + " " + article.summary);
+          
+          // Generate better summary if needed
+          if (article.summary.length < 100) {
+            summary = await summarizeArticle(article.title, article.content);
+          }
+        } catch (aiError) {
+          console.log(`AI analysis failed for "${article.title}", using fallback values`);
+          // Extract basic keywords from title and content
+          keywords = this.extractBasicKeywords(article.title + " " + article.summary);
+        }
+
+        const processedArticle: InsertArticle = {
+          title: article.title,
+          summary,
+          content: article.content,
+          source: article.source,
+          url: article.url,
+          imageUrl: article.imageUrl,
+          category: article.category,
+          readTime: article.readTime,
+          sentiment,
+          keywords,
+          isCurated: false,
+          isTopFive: false,
+          publishedAt: article.publishedAt,
+        };
+
+        processed.push(processedArticle);
+      } catch (error) {
+        console.error(`Failed to process RSS article: ${article.title}`, error);
+        continue;
+      }
+    }
+
+    return processed;
+  }
+
+  private async processNewsAPIArticles(articles: NewsAPIArticle[]): Promise<InsertArticle[]> {
     const processed: InsertArticle[] = [];
 
     for (const article of articles) {
       if (!article.title || !article.description || !article.content) continue;
 
       try {
-        // Analyze sentiment
-        const sentiment = await analyzeSentiment(article.title + " " + article.description);
-        
-        // Generate summary
-        const summary = await summarizeArticle(article.title, article.content);
-        
-        // Extract keywords
-        const keywords = await extractKeywords(article.title + " " + article.description);
+        // Use fallback values if AI analysis fails
+        let sentiment = 0.7;
+        let keywords: string[] = [];
+        let summary = article.description;
+
+        try {
+          const sentimentResult = await analyzeSentiment(article.title + " " + article.description);
+          sentiment = sentimentResult.rating;
+          
+          summary = await summarizeArticle(article.title, article.content);
+          keywords = await extractKeywords(article.title + " " + article.description);
+        } catch (aiError) {
+          console.log(`AI analysis failed for "${article.title}", using fallback values`);
+          keywords = this.extractBasicKeywords(article.title + " " + article.description);
+        }
 
         // Estimate read time (average 200 words per minute)
         const wordCount = article.content.split(' ').length;
@@ -95,7 +188,7 @@ export class NewsService {
           imageUrl: article.urlToImage,
           category: this.categorizeArticle(keywords),
           readTime,
-          sentiment: sentiment.rating,
+          sentiment,
           keywords,
           isCurated: false,
           isTopFive: false,
@@ -104,11 +197,23 @@ export class NewsService {
 
         processed.push(processedArticle);
       } catch (error) {
-        console.error("Failed to process article:", article.title, error);
+        console.error("Failed to process NewsAPI article:", article.title, error);
+        continue;
       }
     }
 
     return processed;
+  }
+
+  private extractBasicKeywords(text: string): string[] {
+    const commonWords = new Set(['the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'is', 'are', 'was', 'were', 'be', 'been', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could', 'should', 'may', 'might', 'must', 'can', 'this', 'that', 'these', 'those']);
+    
+    return text
+      .toLowerCase()
+      .replace(/[^\w\s]/g, ' ')
+      .split(/\s+/)
+      .filter(word => word.length > 3 && !commonWords.has(word))
+      .slice(0, 10);
   }
 
   private categorizeArticle(keywords: string[]): string {
