@@ -88,16 +88,13 @@ export function PodcastSection() {
           <div className="flex items-center space-x-3">
             <Mic className="text-white text-lg" />
             <h2 className="text-xl font-bold text-white">Daily Podcast</h2>
-            <Badge variant="secondary" className="bg-white/20 text-white">
-              AI Generated
-            </Badge>
+            <Badge variant="secondary" className="bg-white/20 text-white">Just for You</Badge>
           </div>
           <div className="text-white text-sm">
             {hasGeneratedToday ? "Today's episode ready" : "Generate today's episode"}
           </div>
         </div>
       </div>
-      
       <div className="p-6">
         {/* Generate/Regenerate Button */}
         <div className="mb-6">
