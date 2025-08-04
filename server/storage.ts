@@ -139,6 +139,7 @@ export class MemStorage implements IStorage {
     const id = randomUUID();
     const podcast: Podcast = { 
       ...insertPodcast,
+      audioUrl: insertPodcast.audioUrl || null,
       id,
     };
     this.podcasts.set(id, podcast);

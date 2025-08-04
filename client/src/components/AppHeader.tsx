@@ -17,9 +17,7 @@ export function AppHeader({ filteredCount }: AppHeaderProps) {
               </div>
               <h1 className="text-xl font-bold text-slate-900" data-testid="text-app-title">BrightBuzz</h1>
             </div>
-            <span className="text-sm text-slate-500 hidden sm:block">
-              AI-Curated News for Professionals
-            </span>
+            <span className="text-sm text-slate-500 hidden sm:block">Stay informed, not overwhelmed.</span>
           </div>
           
           <div className="flex items-center space-x-4">
