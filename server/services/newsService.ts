@@ -37,8 +37,8 @@ export class NewsService {
       const rssArticles = await this.rssService.getLatestArticles();
       console.log(`Retrieved ${rssArticles.length} articles from RSS feeds`);
 
-      // Process RSS articles with AI analysis
-      const processedArticles = await this.processRSSArticles(rssArticles);
+      // Process RSS articles with fallback-only processing (skip AI due to quota)
+      const processedArticles = await this.processRSSArticlesWithFallback(rssArticles);
       
       // Store articles
       for (const article of processedArticles) {
@@ -112,18 +112,27 @@ export class NewsService {
           // Analyze sentiment
           const sentimentResult = await analyzeSentiment(article.title + " " + article.summary);
           sentiment = sentimentResult.rating;
-          
+        } catch (aiError) {
+          console.log(`AI sentiment analysis failed for "${article.title}", using default sentiment`);
+          sentiment = 0.7; // Default positive sentiment
+        }
+
+        try {
           // Extract keywords
           keywords = await extractKeywords(article.title + " " + article.summary);
-          
+        } catch (aiError) {
+          console.log(`AI keyword extraction failed for "${article.title}", using basic keywords`);
+          keywords = this.extractBasicKeywords(article.title + " " + article.summary);
+        }
+
+        try {
           // Generate better summary if needed
           if (article.summary.length < 100) {
             summary = await summarizeArticle(article.title, article.content);
           }
         } catch (aiError) {
-          console.log(`AI analysis failed for "${article.title}", using fallback values`);
-          // Extract basic keywords from title and content
-          keywords = this.extractBasicKeywords(article.title + " " + article.summary);
+          console.log(`AI summarization failed for "${article.title}", using original summary`);
+          // Keep the original summary
         }
 
         const processedArticle: InsertArticle = {
@@ -167,11 +176,22 @@ export class NewsService {
         try {
           const sentimentResult = await analyzeSentiment(article.title + " " + article.description);
           sentiment = sentimentResult.rating;
-          
+        } catch (aiError) {
+          console.log(`AI sentiment analysis failed for "${article.title}", using default sentiment`);
+          sentiment = 0.7;
+        }
+
+        try {
           summary = await summarizeArticle(article.title, article.content);
+        } catch (aiError) {
+          console.log(`AI summarization failed for "${article.title}", using original description`);
+          summary = article.description;
+        }
+
+        try {
           keywords = await extractKeywords(article.title + " " + article.description);
         } catch (aiError) {
-          console.log(`AI analysis failed for "${article.title}", using fallback values`);
+          console.log(`AI keyword extraction failed for "${article.title}", using basic keywords`);
           keywords = this.extractBasicKeywords(article.title + " " + article.description);
         }
 
@@ -202,6 +222,46 @@ export class NewsService {
       }
     }
 
+    return processed;
+  }
+
+  private async processRSSArticlesWithFallback(articles: Omit<InsertArticle, 'id' | 'views' | 'sentiment' | 'keywords' | 'isCurated' | 'isTopFive'>[]): Promise<InsertArticle[]> {
+    const processed: InsertArticle[] = [];
+
+    for (const article of articles) {
+      if (!article.title || !article.summary || !article.content) continue;
+
+      try {
+        // Use only fallback processing - no AI calls
+        const sentiment = 0.7; // Default positive sentiment
+        const keywords = this.extractBasicKeywords(article.title + " " + article.summary);
+        const summary = article.summary;
+
+        const processedArticle: InsertArticle = {
+          title: article.title,
+          summary,
+          content: article.content,
+          source: article.source,
+          url: article.url,
+          imageUrl: article.imageUrl,
+          category: article.category,
+          readTime: article.readTime,
+          sentiment,
+          keywords,
+          isCurated: false,
+          isTopFive: false,
+          publishedAt: article.publishedAt,
+        };
+
+        processed.push(processedArticle);
+        console.log(`Processed RSS article: "${article.title}" from ${article.source}`);
+      } catch (error) {
+        console.error(`Failed to process RSS article: ${article.title}`, error);
+        continue;
+      }
+    }
+
+    console.log(`Successfully processed ${processed.length} RSS articles with fallback method`);
     return processed;
   }
 
