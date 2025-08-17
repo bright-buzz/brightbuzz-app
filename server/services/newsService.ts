@@ -51,8 +51,8 @@ export class NewsService {
         await this.fetchFromNewsAPI();
       }
 
-      // Run AI curation
-      await this.runAICuration();
+      // Run curation (with fallback if AI fails)
+      await this.runCurationWithFallback();
 
       this.lastFetchTime = now;
     } catch (error) {
@@ -294,22 +294,77 @@ export class NewsService {
     return 'General';
   }
 
-  private async runAICuration(): Promise<void> {
+  private async runCurationWithFallback(): Promise<void> {
     try {
       const articles = await storage.getArticles();
-      const curation = await curateArticles(articles);
-
-      // Update curated articles
-      for (const articleId of curation.curated) {
-        await storage.updateArticle(articleId, { isCurated: true });
-      }
-
-      // Update top five articles
-      for (const articleId of curation.topFive) {
-        await storage.updateArticle(articleId, { isTopFive: true });
-      }
+      
+      // Skip AI curation due to quota limits, use basic curation directly
+      console.log("Using basic curation due to AI quota limits");
+      await this.runBasicCuration(articles);
     } catch (error) {
-      console.error("Failed to run AI curation:", error);
+      console.error("Failed to run curation:", error);
+    }
+  }
+
+  private async runBasicCuration(articles: any[]): Promise<void> {
+    try {
+      console.log(`Starting basic curation with ${articles.length} articles`);
+      
+      // Filter out negative keywords first
+      const blockedKeywords = await storage.getKeywords();
+      const blockedTerms = blockedKeywords
+        .filter((k: any) => k.type === 'blocked')
+        .map((k: any) => k.keyword.toLowerCase());
+      
+      const filteredArticles = articles.filter((article: any) => {
+        const articleText = `${article.title} ${article.summary}`.toLowerCase();
+        return !blockedTerms.some((term: string) => articleText.includes(term));
+      });
+
+      console.log(`After keyword filtering: ${filteredArticles.length} articles remain`);
+      
+      // Simple scoring based on positive criteria
+      const scoredArticles = filteredArticles.map((article: any) => {
+        let score = article.sentiment || 0.7; // Base sentiment score
+        
+        const titleAndSummary = `${article.title} ${article.summary}`.toLowerCase();
+        
+        // Boost score for positive business/tech terms
+        const positiveTerms = ['growth', 'innovation', 'success', 'breakthrough', 'launch', 'funding', 'profit', 'advance', 'development', 'opportunity', 'market', 'technology', 'ai', 'startup'];
+        const positiveMatches = positiveTerms.filter(term => titleAndSummary.includes(term)).length;
+        score += positiveMatches * 0.1;
+        
+        // Boost for technology and business categories
+        if (article.category === 'Technology' || article.category === 'Business') {
+          score += 0.2;
+        }
+        
+        // Boost for recent articles
+        const hoursOld = (Date.now() - new Date(article.publishedAt).getTime()) / (1000 * 60 * 60);
+        if (hoursOld < 24) score += 0.1;
+        
+        return { ...article, score };
+      });
+
+      // Sort by score (highest first)
+      const sortedArticles = scoredArticles.sort((a, b) => b.score - a.score);
+
+      // Mark top 15 as curated
+      const curatedCount = Math.min(15, sortedArticles.length);
+      for (let i = 0; i < curatedCount; i++) {
+        await storage.updateArticle(sortedArticles[i].id, { isCurated: true });
+      }
+
+      // Mark top 5 as top five
+      const topFiveCount = Math.min(5, sortedArticles.length);
+      for (let i = 0; i < topFiveCount; i++) {
+        await storage.updateArticle(sortedArticles[i].id, { isTopFive: true });
+      }
+
+      console.log(`Basic curation complete: ${curatedCount} curated, ${topFiveCount} top five`);
+      console.log(`Top article: "${sortedArticles[0]?.title}" (score: ${sortedArticles[0]?.score})`);
+    } catch (error) {
+      console.error("Failed to run basic curation:", error);
     }
   }
 
