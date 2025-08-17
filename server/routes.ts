@@ -110,19 +110,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Filter preview endpoint
-  app.post("/api/filter-preview", async (req, res) => {
+  // Filter preview endpoint  
+  app.get("/api/filter-preview", async (req, res) => {
     try {
-      const { sentimentThreshold } = req.body;
+      const preferences = await storage.getUserPreferences();
       const articles = await storage.getArticles();
       const blockedKeywords = await storage.getKeywordsByType('blocked');
-      const blocked = blockedKeywords.map(kw => kw.keyword);
+      const blocked = blockedKeywords.map(kw => kw.keyword.toLowerCase());
       
-      const filtered = await newsService.filterArticles(articles, blocked, sentimentThreshold || 0.7);
+      // Simple filtering logic
+      const filtered = articles.filter(article => {
+        // Check sentiment threshold
+        if (article.sentiment < (preferences?.sentimentThreshold || 0.7)) {
+          return false;
+        }
+        
+        // Check blocked keywords
+        const articleText = `${article.title} ${article.summary}`.toLowerCase();
+        const hasBlockedKeyword = blocked.some(blockedTerm => 
+          articleText.includes(blockedTerm) ||
+          (article.keywords || []).some((kw: string) => kw.toLowerCase().includes(blockedTerm))
+        );
+        
+        return !hasBlockedKeyword;
+      });
       
       const preview: FilterPreview = {
-        original: articles,
-        filtered,
+        original: articles.slice(0, 20), // Limit for UI performance
+        filtered: filtered.slice(0, 20),
         stats: {
           totalArticles: articles.length,
           filteredCount: articles.length - filtered.length,
@@ -134,6 +149,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       res.json(preview);
     } catch (error) {
+      console.error("Filter preview error:", error);
+      res.status(500).json({ message: "Failed to generate filter preview" });
+    }
+  });
+
+  app.post("/api/filter-preview", async (req, res) => {
+    try {
+      const { sentimentThreshold } = req.body;
+      const articles = await storage.getArticles();
+      const blockedKeywords = await storage.getKeywordsByType('blocked');
+      const blocked = blockedKeywords.map(kw => kw.keyword.toLowerCase());
+      
+      // Simple filtering logic with custom threshold
+      const filtered = articles.filter(article => {
+        // Check sentiment threshold
+        if (article.sentiment < (sentimentThreshold || 0.7)) {
+          return false;
+        }
+        
+        // Check blocked keywords
+        const articleText = `${article.title} ${article.summary}`.toLowerCase();
+        const hasBlockedKeyword = blocked.some(blockedTerm => 
+          articleText.includes(blockedTerm) ||
+          (article.keywords || []).some((kw: string) => kw.toLowerCase().includes(blockedTerm))
+        );
+        
+        return !hasBlockedKeyword;
+      });
+      
+      const preview: FilterPreview = {
+        original: articles.slice(0, 20),
+        filtered: filtered.slice(0, 20),
+        stats: {
+          totalArticles: articles.length,
+          filteredCount: articles.length - filtered.length,
+          passedCount: filtered.length,
+          avgSentiment: filtered.length > 0 ? filtered.reduce((sum, a) => sum + a.sentiment, 0) / filtered.length : 0,
+          anxietyReduction: articles.length > 0 ? Math.round(((articles.length - filtered.length) / articles.length) * 100) : 0
+        }
+      };
+      
+      res.json(preview);
+    } catch (error) {
+      console.error("Filter preview error:", error);
       res.status(500).json({ message: "Failed to generate filter preview" });
     }
   });
