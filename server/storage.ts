@@ -23,6 +23,7 @@ export interface IStorage {
   createPodcast(podcast: InsertPodcast): Promise<Podcast>;
   getPodcasts(): Promise<Podcast[]>;
   getPodcast(id: string): Promise<Podcast | undefined>;
+  getPodcastByDate(date: string): Promise<Podcast | undefined>;
   updatePodcast(id: string, updates: Partial<Podcast>): Promise<Podcast | undefined>;
 }
 
@@ -155,6 +156,12 @@ export class MemStorage implements IStorage {
 
   async getPodcast(id: string): Promise<Podcast | undefined> {
     return this.podcasts.get(id);
+  }
+
+  async getPodcastByDate(date: string): Promise<Podcast | undefined> {
+    return Array.from(this.podcasts.values()).find(podcast => 
+      podcast.createdAt.startsWith(date)
+    );
   }
 
   async updatePodcast(id: string, updates: Partial<Podcast>): Promise<Podcast | undefined> {

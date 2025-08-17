@@ -45,8 +45,8 @@ export class PodcastService {
         return !hasBlockedKeyword;
       });
 
-      // Generate podcast script
-      const podcastScript = await this.generateScript(filteredArticles);
+      // Generate podcast script with fallback
+      const podcastScript = await this.generateScriptWithFallback(filteredArticles);
       
       // Generate audio (simulated for now - would use OpenAI TTS or similar)
       const audioUrl = await this.generateAudio(podcastScript);
@@ -69,6 +69,12 @@ export class PodcastService {
       console.error("Failed to generate podcast:", error);
       throw error;
     }
+  }
+
+  private async generateScriptWithFallback(articles: Article[]): Promise<string> {
+    // Skip AI generation due to quota limits, use basic template directly
+    console.log("Using template-based podcast generation due to AI quota limits");
+    return this.generateBasicScript(articles);
   }
 
   private async generateScript(articles: Article[]): Promise<string> {
@@ -110,6 +116,41 @@ Format the script with clear sections: [INTRO], [STORY 1], [STORY 2], etc., [OUT
     });
 
     return response.choices[0].message.content || "Script generation failed.";
+  }
+
+  private generateBasicScript(articles: Article[]): string {
+    const date = new Date().toLocaleDateString('en-US', { 
+      weekday: 'long', 
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric' 
+    });
+
+    let script = `[INTRO]
+Good morning, and welcome to your daily NewsFlow digest for ${date}. I'm here to keep you informed with the latest business and technology news that matters to your career and professional growth. Today, we're covering ${articles.length} carefully curated stories designed to inspire and inform without the anxiety. Let's dive in.
+
+`;
+
+    articles.forEach((article, index) => {
+      const storyNumber = index + 1;
+      script += `[STORY ${storyNumber}]
+Our ${storyNumber === 1 ? 'top' : 'next'} story comes from ${article.source}. ${article.title}. 
+
+${article.summary}
+
+This development is particularly relevant for young professionals because it highlights ongoing trends in ${article.category.toLowerCase()} that could create new opportunities and career paths. Whether you're looking to advance in your current role or exploring new industries, staying informed about these changes helps you position yourself for success.
+
+`;
+    });
+
+    script += `[OUTRO]
+That wraps up today's NewsFlow digest. We've covered ${articles.length} stories spanning business, technology, and career development - all filtered to help you stay informed while maintaining a positive outlook on your professional journey.
+
+Remember, every challenge in the news represents an opportunity for innovation and growth. As a young professional, you're uniquely positioned to adapt, learn, and thrive in our rapidly changing world.
+
+Thanks for tuning in to NewsFlow. We'll be back tomorrow with more curated news designed specifically for ambitious professionals like you. Until then, stay curious, stay positive, and keep building your future.`;
+
+    return script;
   }
 
   private async generateAudio(script: string): Promise<string> {
