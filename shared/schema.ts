@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, real, boolean, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, real, boolean, jsonb, timestamp, index } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -27,8 +27,31 @@ export const keywords = pgTable("keywords", {
   type: text("type").notNull(), // 'blocked', 'prioritized'
 });
 
+// Session storage table for Replit Auth
+export const sessions = pgTable(
+  "sessions",
+  {
+    sid: varchar("sid").primaryKey(),
+    sess: jsonb("sess").notNull(),
+    expire: timestamp("expire").notNull(),
+  },
+  (table) => [index("IDX_session_expire").on(table.expire)],
+);
+
+// User storage table for Replit Auth
+export const users = pgTable("users", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  email: varchar("email").unique(),
+  firstName: varchar("first_name"),
+  lastName: varchar("last_name"),
+  profileImageUrl: varchar("profile_image_url"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 export const userPreferences = pgTable("user_preferences", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id),
   sentimentThreshold: real("sentiment_threshold").default(0.7),
   realTimeFiltering: boolean("real_time_filtering").default(true),
 });
@@ -83,3 +106,12 @@ export const insertPodcastSchema = createInsertSchema(podcasts).omit({
 
 export type Podcast = typeof podcasts.$inferSelect;
 export type InsertPodcast = z.infer<typeof insertPodcastSchema>;
+
+// User types for Replit Auth
+export const upsertUserSchema = createInsertSchema(users).omit({
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type UpsertUser = z.infer<typeof upsertUserSchema>;
+export type User = typeof users.$inferSelect;

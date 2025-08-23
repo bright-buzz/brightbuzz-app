@@ -12,6 +12,14 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
+- **User Authentication with Replit Auth (August 2025)**: Completed secure authentication system
+  - Integrated Replit OpenID Connect authentication for secure user login/logout
+  - Added PostgreSQL database with users, sessions, and user preferences tables
+  - User-specific preferences and settings with database persistence
+  - Beautiful landing page for unauthenticated users with sign-in functionality
+  - Enhanced app header with user profile dropdown and logout option
+  - Seamless routing between landing page and authenticated app experience
+
 - **RSS Feed Integration with Resilient Fallbacks (August 2025)**: Completed robust news processing pipeline
   - Integrated feeds from TechCrunch, The Verge, Bloomberg, Reuters, Harvard Business Review, and others
   - RSS parsing with content cleaning and categorization processing 50+ articles

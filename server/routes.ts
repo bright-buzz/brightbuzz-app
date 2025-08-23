@@ -3,10 +3,25 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { newsService } from "./services/newsService";
 import { podcastService } from "./services/podcastService";
+import { setupAuth, isAuthenticated } from "./replitAuth";
 import { insertKeywordSchema } from "@shared/schema";
 import type { FilterPreview } from "@shared/schema";
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Auth middleware
+  await setupAuth(app);
+
+  // Auth routes
+  app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      res.json(user);
+    } catch (error) {
+      console.error("Error fetching user:", error);
+      res.status(500).json({ message: "Failed to fetch user" });
+    }
+  });
   // Articles endpoints
   app.get("/api/articles", async (req, res) => {
     try {
@@ -92,18 +107,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // User preferences endpoints
-  app.get("/api/preferences", async (req, res) => {
+  app.get("/api/preferences", async (req: any, res) => {
     try {
-      const preferences = await storage.getUserPreferences();
+      const userId = req.isAuthenticated() ? req.user.claims.sub : undefined;
+      const preferences = await storage.getUserPreferences(userId);
       res.json(preferences);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch preferences" });
     }
   });
 
-  app.put("/api/preferences", async (req, res) => {
+  app.put("/api/preferences", async (req: any, res) => {
     try {
-      const preferences = await storage.updateUserPreferences(req.body);
+      const userId = req.isAuthenticated() ? req.user.claims.sub : undefined;
+      const preferences = await storage.updateUserPreferences(req.body, userId);
       res.json(preferences);
     } catch (error) {
       res.status(500).json({ message: "Failed to update preferences" });
@@ -111,9 +128,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Filter preview endpoint  
-  app.get("/api/filter-preview", async (req, res) => {
+  app.get("/api/filter-preview", async (req: any, res) => {
     try {
-      const preferences = await storage.getUserPreferences();
+      const userId = req.isAuthenticated() ? req.user.claims.sub : undefined;
+      const preferences = await storage.getUserPreferences(userId);
       const articles = await storage.getArticles();
       const blockedKeywords = await storage.getKeywordsByType('blocked');
       const blocked = blockedKeywords.map(kw => kw.keyword.toLowerCase());

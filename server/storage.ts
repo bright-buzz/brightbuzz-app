@@ -1,7 +1,11 @@
-import { type Article, type InsertArticle, type Keyword, type InsertKeyword, type UserPreferences, type InsertUserPreferences, type Podcast, type InsertPodcast } from "@shared/schema";
+import { type Article, type InsertArticle, type Keyword, type InsertKeyword, type UserPreferences, type InsertUserPreferences, type Podcast, type InsertPodcast, type User, type UpsertUser } from "@shared/schema";
 import { randomUUID } from "crypto";
 
 export interface IStorage {
+  // User operations (mandatory for Replit Auth)
+  getUser(id: string): Promise<User | undefined>;
+  upsertUser(user: UpsertUser): Promise<User>;
+  
   // Articles
   createArticle(article: InsertArticle): Promise<Article>;
   getArticles(): Promise<Article[]>;
@@ -16,8 +20,8 @@ export interface IStorage {
   deleteKeyword(id: string): Promise<boolean>;
   
   // User Preferences
-  getUserPreferences(): Promise<UserPreferences | undefined>;
-  updateUserPreferences(preferences: Partial<UserPreferences>): Promise<UserPreferences>;
+  getUserPreferences(userId?: string): Promise<UserPreferences | undefined>;
+  updateUserPreferences(preferences: Partial<UserPreferences>, userId?: string): Promise<UserPreferences>;
   
   // Podcasts
   createPodcast(podcast: InsertPodcast): Promise<Podcast>;
@@ -31,14 +35,17 @@ export class MemStorage implements IStorage {
   private articles: Map<string, Article>;
   private keywords: Map<string, Keyword>;
   private podcasts: Map<string, Podcast>;
+  private users: Map<string, User>;
   private userPreferences: UserPreferences | undefined;
 
   constructor() {
     this.articles = new Map();
     this.keywords = new Map();
     this.podcasts = new Map();
+    this.users = new Map();
     this.userPreferences = {
       id: randomUUID(),
+      userId: null,
       sentimentThreshold: 0.7,
       realTimeFiltering: true,
     };
@@ -172,6 +179,35 @@ export class MemStorage implements IStorage {
     this.podcasts.set(id, updatedPodcast);
     return updatedPodcast;
   }
+
+  // User operations (mandatory for Replit Auth)
+  async getUser(id: string): Promise<User | undefined> {
+    return this.users.get(id);
+  }
+
+  async upsertUser(userData: UpsertUser): Promise<User> {
+    const existingUser = this.users.get(userData.id);
+    
+    if (existingUser) {
+      const updatedUser = {
+        ...existingUser,
+        ...userData,
+        updatedAt: new Date(),
+      };
+      this.users.set(userData.id, updatedUser);
+      return updatedUser;
+    } else {
+      const newUser: User = {
+        ...userData,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      this.users.set(userData.id, newUser);
+      return newUser;
+    }
+  }
 }
 
-export const storage = new MemStorage();
+import { DatabaseStorage } from "./databaseStorage";
+
+export const storage = new DatabaseStorage();
