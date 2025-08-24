@@ -63,11 +63,18 @@ export class NewsService {
   private async fetchFromNewsAPI(): Promise<void> {
     try {
       const queries = [
-        'artificial intelligence career',
-        'remote work technology',
-        'professional development',
-        'startup innovation',
-        'tech industry growth'
+        'breaking news',
+        'world news',
+        'politics',
+        'technology',
+        'business',
+        'sports',
+        'entertainment',
+        'health',
+        'science',
+        'travel',
+        'environment',
+        'food'
       ];
 
       const allArticles: NewsAPIArticle[] = [];

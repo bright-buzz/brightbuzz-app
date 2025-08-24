@@ -33,7 +33,7 @@ export default function Landing() {
           <div className="text-center max-w-4xl mx-auto">
             <Badge variant="secondary" className="mb-6 px-4 py-2 text-sm">
               <Star className="h-4 w-4 mr-2" />
-              AI-Powered News Curation for Professionals
+              AI-Powered News Curation Across All Categories
             </Badge>
             
             <h1 className="text-5xl md:text-6xl font-bold text-slate-900 mb-6 leading-tight">
@@ -42,8 +42,8 @@ export default function Landing() {
             </h1>
             
             <p className="text-xl text-slate-600 mb-8 leading-relaxed">
-              NewsFlow curates business and tech news using AI to filter out anxiety-inducing content, 
-              keeping you informed while protecting your mental health and productivity.
+              NewsFlow curates news from all categories using AI to filter out anxiety-inducing content, 
+              keeping you informed across world news, technology, sports, entertainment, health, and more while protecting your mental health.
             </p>
             
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-12">
@@ -71,7 +71,7 @@ export default function Landing() {
               </div>
               <div className="flex items-center">
                 <TrendingUp className="h-4 w-4 mr-2 text-purple-500" />
-                Professional Focus
+                All News Categories
               </div>
             </div>
           </div>
@@ -95,7 +95,7 @@ export default function Landing() {
               </div>
               <h3 className="text-xl font-semibold text-slate-900 mb-4">Smart Filtering</h3>
               <p className="text-slate-600 leading-relaxed">
-                AI-powered sentiment analysis removes anxiety-inducing content while preserving important updates that matter to your career.
+                AI-powered sentiment analysis removes anxiety-inducing content while preserving important updates across all news categories that matter to you.
               </p>
             </Card>
 
@@ -105,7 +105,7 @@ export default function Landing() {
               </div>
               <h3 className="text-xl font-semibold text-slate-900 mb-4">Real-Time Curation</h3>
               <p className="text-slate-600 leading-relaxed">
-                Get the most relevant business and tech news curated from trusted sources like Bloomberg, TechCrunch, and The Verge.
+                Get comprehensive news coverage curated from trusted sources like Reuters, BBC, CNN, ESPN, and dozens of other quality publications.
               </p>
             </Card>
 
@@ -115,7 +115,7 @@ export default function Landing() {
               </div>
               <h3 className="text-xl font-semibold text-slate-900 mb-4">Daily Podcasts</h3>
               <p className="text-slate-600 leading-relaxed">
-                Professional 5-10 minute daily podcasts summarizing the most important stories with career-focused insights.
+                Daily 5-10 minute podcasts summarizing the most important stories across all categories with balanced, comprehensive coverage.
               </p>
             </Card>
           </div>
@@ -128,7 +128,7 @@ export default function Landing() {
               Ready to transform your news consumption?
             </h2>
             <p className="text-lg text-slate-600 mb-8">
-              Join thousands of professionals who stay informed without the anxiety.
+              Join thousands of readers who stay informed across all topics without the anxiety.
             </p>
             <Button 
               size="lg" 
@@ -153,7 +153,7 @@ export default function Landing() {
               <span className="text-xl font-bold text-white">NewsFlow</span>
             </div>
             <p className="text-slate-400">
-              AI-powered news curation for young professionals
+              AI-powered news curation across all categories
             </p>
           </div>
         </div>

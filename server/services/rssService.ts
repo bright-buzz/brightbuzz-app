@@ -26,19 +26,63 @@ export class RSSService {
     { url: 'https://www.theverge.com/rss/index.xml', name: 'The Verge', category: 'Technology' },
     { url: 'https://feeds.arstechnica.com/arstechnica/technology-lab', name: 'Ars Technica', category: 'Technology' },
     { url: 'https://rss.cnn.com/rss/edition_technology.rss', name: 'CNN Tech', category: 'Technology' },
+    { url: 'https://feeds.feedburner.com/venturebeat/SZYF', name: 'VentureBeat', category: 'Technology' },
+    { url: 'https://www.sciencedaily.com/rss/computers_math/artificial_intelligence.xml', name: 'Science Daily AI', category: 'Technology' },
     
     // Business feeds
     { url: 'https://feeds.bloomberg.com/markets/news.rss', name: 'Bloomberg Markets', category: 'Business' },
     { url: 'https://feeds.reuters.com/reuters/businessNews', name: 'Reuters Business', category: 'Business' },
     { url: 'https://feeds.fortune.com/fortune/headlines', name: 'Fortune', category: 'Business' },
-    
-    // Career and professional development
     { url: 'https://hbr.org/feed', name: 'Harvard Business Review', category: 'Career' },
     { url: 'https://www.entrepreneur.com/latest.rss', name: 'Entrepreneur', category: 'Business' },
     
-    // Innovation and science
-    { url: 'https://www.sciencedaily.com/rss/computers_math/artificial_intelligence.xml', name: 'Science Daily AI', category: 'Technology' },
-    { url: 'https://feeds.feedburner.com/venturebeat/SZYF', name: 'VentureBeat', category: 'Technology' }
+    // General News
+    { url: 'https://feeds.reuters.com/reuters/topNews', name: 'Reuters Top News', category: 'World News' },
+    { url: 'https://feeds.reuters.com/reuters/domesticNews', name: 'Reuters US News', category: 'US News' },
+    { url: 'https://rss.cnn.com/rss/edition.rss', name: 'CNN World', category: 'World News' },
+    { url: 'https://feeds.npr.org/1001/rss.xml', name: 'NPR News', category: 'News' },
+    { url: 'https://feeds.bbci.co.uk/news/rss.xml', name: 'BBC News', category: 'World News' },
+    { url: 'https://feeds.abcnews.com/abcnews/topstories', name: 'ABC News', category: 'News' },
+    { url: 'https://rss.cnn.com/rss/cnn_topstories.rss', name: 'CNN Top Stories', category: 'News' },
+    
+    // Politics
+    { url: 'https://feeds.reuters.com/reuters/politicsNews', name: 'Reuters Politics', category: 'Politics' },
+    { url: 'https://rss.cnn.com/rss/cnn_allpolitics.rss', name: 'CNN Politics', category: 'Politics' },
+    { url: 'https://feeds.npr.org/1014/rss.xml', name: 'NPR Politics', category: 'Politics' },
+    
+    // Science & Health
+    { url: 'https://feeds.sciencedaily.com/sciencedaily/top_news', name: 'Science Daily', category: 'Science' },
+    { url: 'https://feeds.reuters.com/reuters/health', name: 'Reuters Health', category: 'Health' },
+    { url: 'https://rss.cnn.com/rss/cnn_health.rss', name: 'CNN Health', category: 'Health' },
+    { url: 'https://feeds.nationalgeographic.com/ng/News/News_Main', name: 'National Geographic', category: 'Science' },
+    
+    // Sports
+    { url: 'https://feeds.reuters.com/reuters/sportsNews', name: 'Reuters Sports', category: 'Sports' },
+    { url: 'https://rss.cnn.com/rss/cnn_sports.rss', name: 'CNN Sports', category: 'Sports' },
+    { url: 'https://www.espn.com/espn/rss/news', name: 'ESPN News', category: 'Sports' },
+    { url: 'https://feeds.nfl.com/nfl/news', name: 'NFL News', category: 'Sports' },
+    
+    // Entertainment & Culture
+    { url: 'https://feeds.reuters.com/reuters/entertainment', name: 'Reuters Entertainment', category: 'Entertainment' },
+    { url: 'https://rss.cnn.com/rss/cnn_showbiz.rss', name: 'CNN Entertainment', category: 'Entertainment' },
+    { url: 'https://www.hollywoodreporter.com/feed/', name: 'Hollywood Reporter', category: 'Entertainment' },
+    { url: 'https://feeds.ew.com/ew/latest', name: 'Entertainment Weekly', category: 'Entertainment' },
+    
+    // Lifestyle & Travel
+    { url: 'https://rss.cnn.com/rss/cnn_travel.rss', name: 'CNN Travel', category: 'Travel' },
+    { url: 'https://feeds.conde.nast.com/cntraveler/everything', name: 'Conde Nast Traveler', category: 'Travel' },
+    
+    // Environment & Climate
+    { url: 'https://feeds.reuters.com/reuters/environment', name: 'Reuters Environment', category: 'Environment' },
+    { url: 'https://www.treehugger.com/feeds/rss/', name: 'TreeHugger', category: 'Environment' },
+    
+    // Food & Cooking
+    { url: 'https://feeds.foodnetwork.com/fn/recipes/rss', name: 'Food Network', category: 'Food' },
+    { url: 'https://feeds.epicurious.com/epicurious/recipes', name: 'Epicurious', category: 'Food' },
+    
+    // Finance & Economics
+    { url: 'https://feeds.reuters.com/reuters/markets', name: 'Reuters Markets', category: 'Finance' },
+    { url: 'https://feeds.marketwatch.com/marketwatch/realtimeheadlines/', name: 'MarketWatch', category: 'Finance' }
   ];
 
   constructor() {

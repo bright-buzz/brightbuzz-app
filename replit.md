@@ -2,7 +2,7 @@
 
 ## Overview
 
-NewsFlow is an AI-powered news curation platform designed specifically for young professionals to reduce information anxiety. The application intelligently filters and curates news content based on sentiment analysis and user-defined keywords, presenting only positive, career-focused content while filtering out anxiety-inducing topics like layoffs and economic downturns.
+NewsFlow is an AI-powered news curation platform that reduces information anxiety by intelligently filtering and curating news content from all categories. The application uses sentiment analysis and user-defined keywords to filter out anxiety-inducing content while presenting comprehensive news coverage across technology, business, world news, sports, entertainment, health, science, and more.
 
 The platform features real-time news fetching from external APIs, AI-powered sentiment analysis using OpenAI's GPT-4o model, customizable keyword filtering, automated daily podcast generation, and a modern React-based interface with curated feeds, trending articles, and comprehensive settings management.
 
@@ -20,13 +20,19 @@ Preferred communication style: Simple, everyday language.
   - Enhanced app header with user profile dropdown and logout option
   - Seamless routing between landing page and authenticated app experience
 
+- **Comprehensive News Coverage Expansion (August 2025)**: Expanded to all news categories
+  - Added 40+ RSS feeds covering world news, politics, sports, entertainment, health, science, travel, environment, and more
+  - Integrated major news sources: Reuters, BBC, CNN, NPR, ABC, ESPN, National Geographic, Hollywood Reporter
+  - Comprehensive coverage from business and technology to lifestyle and entertainment
+  - AI filtering works across all categories to remove anxiety-inducing content while preserving diverse, quality journalism
+  - Updated platform messaging to reflect comprehensive news coverage rather than professional-only focus
+
 - **RSS Feed Integration with Resilient Fallbacks (August 2025)**: Completed robust news processing pipeline
-  - Integrated feeds from TechCrunch, The Verge, Bloomberg, Reuters, Harvard Business Review, and others
   - RSS parsing with content cleaning and categorization processing 50+ articles
   - Basic curation system that works independently of AI quota limitations
   - Template-based podcast generation ensuring 5-10 minute daily digests
   - Complete fallback systems for both article curation and podcast generation
-  - Real professional news content flowing through all features
+  - Real news content flowing through all features from diverse sources
 
 ## System Architecture
 
