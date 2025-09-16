@@ -27,6 +27,14 @@ export const keywords = pgTable("keywords", {
   type: text("type").notNull(), // 'blocked', 'prioritized'
 });
 
+export const replacementPatterns = pgTable("replacement_patterns", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  findText: text("find_text").notNull(),
+  replaceText: text("replace_text").notNull(),
+  caseSensitive: boolean("case_sensitive").default(false),
+  userId: varchar("user_id").references(() => users.id),
+});
+
 // Session storage table for Replit Auth
 export const sessions = pgTable(
   "sessions",
@@ -65,6 +73,10 @@ export const insertKeywordSchema = createInsertSchema(keywords).omit({
   id: true,
 });
 
+export const insertReplacementPatternSchema = createInsertSchema(replacementPatterns).omit({
+  id: true,
+});
+
 export const insertUserPreferencesSchema = createInsertSchema(userPreferences).omit({
   id: true,
 });
@@ -73,6 +85,8 @@ export type Article = typeof articles.$inferSelect;
 export type InsertArticle = z.infer<typeof insertArticleSchema>;
 export type Keyword = typeof keywords.$inferSelect;
 export type InsertKeyword = z.infer<typeof insertKeywordSchema>;
+export type ReplacementPattern = typeof replacementPatterns.$inferSelect;
+export type InsertReplacementPattern = z.infer<typeof insertReplacementPatternSchema>;
 export type UserPreferences = typeof userPreferences.$inferSelect;
 export type InsertUserPreferences = z.infer<typeof insertUserPreferencesSchema>;
 
