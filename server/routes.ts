@@ -32,19 +32,101 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/articles/curated", async (req, res) => {
+  app.get("/api/articles/curated", async (req: any, res) => {
     try {
       const articles = await storage.getCuratedArticles();
-      res.json(articles);
+      
+      // Apply replacement patterns if user is authenticated
+      if (req.isAuthenticated()) {
+        const userId = req.user.claims.sub;
+        let replacementPatterns: any[] = [];
+        try {
+          replacementPatterns = await storage.getReplacementPatterns(userId);
+        } catch (error) {
+          console.error('Failed to fetch replacement patterns:', error);
+        }
+
+        console.log(`Curated endpoint: Found ${replacementPatterns.length} replacement patterns for user ${userId}`);
+
+        const applyReplacementPatterns = (text: string): string => {
+          let transformedText = text;
+          
+          for (const pattern of replacementPatterns) {
+            // Escape user input for literal replacement to prevent ReDoS
+            const escapedFind = pattern.findText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            // Respect caseSensitive flag
+            const flags = pattern.caseSensitive ? 'g' : 'gi';
+            const regex = new RegExp(escapedFind, flags);
+            const beforeText = transformedText;
+            transformedText = transformedText.replace(regex, pattern.replaceText);
+            if (beforeText !== transformedText) {
+              console.log(`Curated: Replacement applied \"${pattern.findText}\" -> \"${pattern.replaceText}\" in: \"${beforeText.substring(0, 100)}...\"`); 
+            }
+          }
+          
+          return transformedText;
+        };
+
+        const transformedArticles = articles.map((article) => ({
+          ...article,
+          title: applyReplacementPatterns(article.title),
+          summary: applyReplacementPatterns(article.summary)
+        }));
+        
+        res.json(transformedArticles);
+      } else {
+        res.json(articles);
+      }
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch curated articles" });
     }
   });
 
-  app.get("/api/articles/top-five", async (req, res) => {
+  app.get("/api/articles/top-five", async (req: any, res) => {
     try {
       const articles = await storage.getTopFiveArticles();
-      res.json(articles);
+      
+      // Apply replacement patterns if user is authenticated
+      if (req.isAuthenticated()) {
+        const userId = req.user.claims.sub;
+        let replacementPatterns: any[] = [];
+        try {
+          replacementPatterns = await storage.getReplacementPatterns(userId);
+        } catch (error) {
+          console.error('Failed to fetch replacement patterns:', error);
+        }
+
+        console.log(`Top-five endpoint: Found ${replacementPatterns.length} replacement patterns for user ${userId}`);
+
+        const applyReplacementPatterns = (text: string): string => {
+          let transformedText = text;
+          
+          for (const pattern of replacementPatterns) {
+            // Escape user input for literal replacement to prevent ReDoS
+            const escapedFind = pattern.findText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            // Respect caseSensitive flag
+            const flags = pattern.caseSensitive ? 'g' : 'gi';
+            const regex = new RegExp(escapedFind, flags);
+            const beforeText = transformedText;
+            transformedText = transformedText.replace(regex, pattern.replaceText);
+            if (beforeText !== transformedText) {
+              console.log(`Top-five: Replacement applied \"${pattern.findText}\" -> \"${pattern.replaceText}\" in: \"${beforeText.substring(0, 100)}...\"`); 
+            }
+          }
+          
+          return transformedText;
+        };
+
+        const transformedArticles = articles.map((article) => ({
+          ...article,
+          title: applyReplacementPatterns(article.title),
+          summary: applyReplacementPatterns(article.summary)
+        }));
+        
+        res.json(transformedArticles);
+      } else {
+        res.json(articles);
+      }
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch top five articles" });
     }
