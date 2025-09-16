@@ -4,7 +4,7 @@ import { storage } from "./storage";
 import { newsService } from "./services/newsService";
 import { podcastService } from "./services/podcastService";
 import { setupAuth, isAuthenticated } from "./replitAuth";
-import { insertKeywordSchema } from "@shared/schema";
+import { insertKeywordSchema, insertReplacementPatternSchema } from "@shared/schema";
 import type { FilterPreview } from "@shared/schema";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -103,6 +103,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     } catch (error) {
       res.status(500).json({ message: "Failed to delete keyword" });
+    }
+  });
+
+  // Replacement patterns endpoints
+  app.get("/api/replacement-patterns", async (req: any, res) => {
+    try {
+      if (!req.isAuthenticated()) {
+        res.json([]);
+        return;
+      }
+      const userId = req.user.claims.sub;
+      const patterns = await storage.getReplacementPatterns(userId);
+      res.json(patterns);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch replacement patterns" });
+    }
+  });
+
+  app.post("/api/replacement-patterns", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const patternData = insertReplacementPatternSchema.parse({
+        ...req.body,
+        userId
+      });
+      const pattern = await storage.createReplacementPattern(patternData);
+      res.json(pattern);
+    } catch (error) {
+      res.status(400).json({ message: "Invalid replacement pattern data" });
+    }
+  });
+
+  app.delete("/api/replacement-patterns/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const userId = req.user.claims.sub;
+      
+      // Verify ownership before deletion
+      const existingPatterns = await storage.getReplacementPatterns(userId);
+      const pattern = existingPatterns.find(p => p.id === id);
+      
+      if (!pattern) {
+        res.status(404).json({ message: "Replacement pattern not found" });
+        return;
+      }
+      
+      const deleted = await storage.deleteReplacementPattern(id);
+      if (deleted) {
+        res.json({ success: true });
+      } else {
+        res.status(404).json({ message: "Replacement pattern not found" });
+      }
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete replacement pattern" });
     }
   });
 
