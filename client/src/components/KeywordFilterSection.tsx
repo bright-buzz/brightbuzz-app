@@ -5,14 +5,17 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
-import { Filter, ShieldCheck, Ban, Check, Smile, Plus, Frown, Eye } from "lucide-react";
+import { Filter, ShieldCheck, Ban, Check, Smile, Plus, Frown, Eye, RefreshCw } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import type { Keyword, UserPreferences, FilterPreview } from "@shared/schema";
+import type { Keyword, UserPreferences, FilterPreview, ReplacementPattern } from "@shared/schema";
 
 export function KeywordFilterSection() {
   const [newBlockedKeyword, setNewBlockedKeyword] = useState("");
   const [newPrioritizedKeyword, setNewPrioritizedKeyword] = useState("");
+  const [newReplacementFind, setNewReplacementFind] = useState("");
+  const [newReplacementReplace, setNewReplacementReplace] = useState("");
+  const [newReplacementCaseSensitive, setNewReplacementCaseSensitive] = useState(false);
   const { toast } = useToast();
 
   const { data: blockedKeywords = [] } = useQuery<Keyword[]>({
@@ -27,6 +30,10 @@ export function KeywordFilterSection() {
     queryKey: ['/api/preferences'],
   });
 
+  const { data: replacementPatterns = [] } = useQuery<ReplacementPattern[]>({
+    queryKey: ['/api/replacement-patterns'],
+  });
+
   const { data: filterPreview } = useQuery<FilterPreview>({
     queryKey: ['/api/filter-preview'],
     enabled: !!preferences,
@@ -39,6 +46,26 @@ export function KeywordFilterSection() {
       queryClient.invalidateQueries({ queryKey: ['/api/keywords'] });
       queryClient.invalidateQueries({ queryKey: ['/api/filter-preview'] });
       toast({ title: "Keyword added successfully" });
+    },
+  });
+
+  const addReplacementPatternMutation = useMutation({
+    mutationFn: (data: { findText: string; replaceText: string; caseSensitive: boolean }) =>
+      apiRequest('POST', '/api/replacement-patterns', data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/replacement-patterns'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/filter-preview'] });
+      toast({ title: "Replacement pattern added successfully" });
+    },
+  });
+
+  const deleteReplacementPatternMutation = useMutation({
+    mutationFn: (id: string) =>
+      apiRequest('DELETE', `/api/replacement-patterns/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/replacement-patterns'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/filter-preview'] });
+      toast({ title: "Replacement pattern deleted successfully" });
     },
   });
 
@@ -71,6 +98,23 @@ export function KeywordFilterSection() {
 
   const handleRealTimeToggle = (enabled: boolean) => {
     updatePreferencesMutation.mutate({ realTimeFiltering: enabled });
+  };
+
+  const handleAddReplacementPattern = () => {
+    if (newReplacementFind.trim() && newReplacementReplace.trim()) {
+      addReplacementPatternMutation.mutate({
+        findText: newReplacementFind.trim(),
+        replaceText: newReplacementReplace.trim(),
+        caseSensitive: newReplacementCaseSensitive
+      });
+      setNewReplacementFind("");
+      setNewReplacementReplace("");
+      setNewReplacementCaseSensitive(false);
+    }
+  };
+
+  const handleDeleteReplacementPattern = (id: string) => {
+    deleteReplacementPatternMutation.mutate(id);
   };
 
   return (
@@ -112,7 +156,7 @@ export function KeywordFilterSection() {
             </div>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             {/* Blocked Keywords */}
             <Card className="bg-red-50 border-red-200 p-4">
               <h4 className="text-sm font-medium text-red-800 mb-3 flex items-center">
@@ -213,6 +257,72 @@ export function KeywordFilterSection() {
                 />
                 <div className="text-xs text-slate-500">
                   Articles below this threshold will be filtered
+                </div>
+              </div>
+            </Card>
+
+            {/* Replacement Patterns */}
+            <Card className="bg-purple-50 border-purple-200 p-4">
+              <h4 className="text-sm font-medium text-purple-800 mb-3 flex items-center">
+                <RefreshCw className="mr-2 h-4 w-4" />
+                Word Replacements
+              </h4>
+              <div className="space-y-2 mb-3">
+                {replacementPatterns.map((pattern) => (
+                  <div 
+                    key={pattern.id} 
+                    className="bg-purple-100 text-purple-800 p-2 rounded text-xs cursor-pointer hover:bg-purple-200"
+                    onClick={() => handleDeleteReplacementPattern(pattern.id)}
+                    data-testid={`replacement-pattern-${pattern.id}`}
+                  >
+                    <div className="font-medium">"{pattern.findText}" → "{pattern.replaceText}"</div>
+                    <div className="text-purple-600 mt-1">
+                      {pattern.caseSensitive ? "Case sensitive" : "Case insensitive"} • Click to remove
+                    </div>
+                  </div>
+                ))}
+                {replacementPatterns.length === 0 && (
+                  <div className="text-xs text-purple-600 italic">No replacements set</div>
+                )}
+              </div>
+              <div className="space-y-2">
+                <div className="flex space-x-2">
+                  <Input
+                    placeholder="Find text"
+                    value={newReplacementFind}
+                    onChange={(e) => setNewReplacementFind(e.target.value)}
+                    className="text-xs"
+                    data-testid="input-replacement-find"
+                  />
+                  <Input
+                    placeholder="Replace with"
+                    value={newReplacementReplace}
+                    onChange={(e) => setNewReplacementReplace(e.target.value)}
+                    className="text-xs"
+                    data-testid="input-replacement-replace"
+                  />
+                </div>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      id="case-sensitive"
+                      checked={newReplacementCaseSensitive}
+                      onChange={(e) => setNewReplacementCaseSensitive(e.target.checked)}
+                      className="w-3 h-3"
+                      data-testid="checkbox-case-sensitive"
+                    />
+                    <label htmlFor="case-sensitive" className="text-xs text-purple-700">Case sensitive</label>
+                  </div>
+                  <Button 
+                    size="sm" 
+                    className="bg-purple-600 hover:bg-purple-700"
+                    onClick={handleAddReplacementPattern}
+                    disabled={!newReplacementFind.trim() || !newReplacementReplace.trim()}
+                    data-testid="button-add-replacement-pattern"
+                  >
+                    <Plus className="h-3 w-3" />
+                  </Button>
                 </div>
               </div>
             </Card>
