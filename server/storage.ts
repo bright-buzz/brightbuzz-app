@@ -147,11 +147,10 @@ export class MemStorage implements IStorage {
   }
 
   async getReplacementPatterns(userId?: string): Promise<ReplacementPattern[]> {
-    const patterns = Array.from(this.replacementPatterns.values());
-    if (userId) {
-      return patterns.filter(pattern => pattern.userId === userId);
-    }
-    return patterns;
+    // Return empty array if no userId - replacements are user-specific only
+    if (!userId) return [];
+    return Array.from(this.replacementPatterns.values())
+      .filter(pattern => pattern.userId === userId);
   }
 
   async deleteReplacementPattern(id: string): Promise<boolean> {

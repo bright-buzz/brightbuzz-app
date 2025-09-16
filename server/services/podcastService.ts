@@ -8,7 +8,22 @@ const openai = new OpenAI({
 });
 
 export class PodcastService {
-  async generateDailyPodcast(): Promise<string> {
+  private applyReplacementPatterns(text: string, replacementPatterns: any[]): string {
+    let transformedText = text;
+    
+    for (const pattern of replacementPatterns) {
+      // Escape user input for literal replacement to prevent ReDoS
+      const escapedFind = pattern.findText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      // Respect caseSensitive flag
+      const flags = pattern.caseSensitive ? 'g' : 'gi';
+      const regex = new RegExp(escapedFind, flags);
+      transformedText = transformedText.replace(regex, pattern.replaceText);
+    }
+    
+    return transformedText;
+  }
+
+  async generateDailyPodcast(userId?: string): Promise<string> {
     try {
       // Get curated articles and top 5 articles
       const curatedArticles = await storage.getCuratedArticles();
@@ -24,18 +39,31 @@ export class PodcastService {
         throw new Error("No articles available for podcast generation");
       }
 
-      // Filter by user preferences
-      const preferences = await storage.getUserPreferences();
+      // Apply replacement patterns first - fetch once and reuse
+      let replacementPatterns: any[] = [];
+      try {
+        replacementPatterns = await storage.getReplacementPatterns(userId);
+      } catch (error) {
+        console.error('Failed to fetch replacement patterns:', error);
+      }
+
+      const transformedArticles = uniqueArticles.map((article) => ({
+        ...article,
+        title: this.applyReplacementPatterns(article.title, replacementPatterns),
+        summary: this.applyReplacementPatterns(article.summary, replacementPatterns)
+      }));
+
+      const preferences = await storage.getUserPreferences(userId);
       const blockedKeywords = await storage.getKeywordsByType('blocked');
       const blocked = blockedKeywords.map(kw => kw.keyword.toLowerCase());
       
-      const filteredArticles = uniqueArticles.filter(article => {
+      const filteredArticles = transformedArticles.filter(article => {
         // Check sentiment threshold
         if (article.sentiment < (preferences?.sentimentThreshold || 0.7)) {
           return false;
         }
         
-        // Check blocked keywords
+        // Check blocked keywords after applying replacements
         const hasBlockedKeyword = blocked.some(blocked => 
           article.title.toLowerCase().includes(blocked) ||
           article.summary.toLowerCase().includes(blocked) ||

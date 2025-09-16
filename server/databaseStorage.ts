@@ -117,14 +117,12 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getReplacementPatterns(userId?: string): Promise<ReplacementPattern[]> {
-    if (userId) {
-      return await db
-        .select()
-        .from(replacementPatterns)
-        .where(eq(replacementPatterns.userId, userId));
-    } else {
-      return await db.select().from(replacementPatterns);
-    }
+    // Return empty array if no userId - replacements are user-specific only
+    if (!userId) return [];
+    return await db
+      .select()
+      .from(replacementPatterns)
+      .where(eq(replacementPatterns.userId, userId));
   }
 
   async deleteReplacementPattern(id: string): Promise<boolean> {

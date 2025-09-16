@@ -283,6 +283,21 @@ export class NewsService {
       .slice(0, 10);
   }
 
+  private applyReplacementPatterns(text: string, replacementPatterns: any[]): string {
+    let transformedText = text;
+    
+    for (const pattern of replacementPatterns) {
+      // Escape user input for literal replacement to prevent ReDoS
+      const escapedFind = pattern.findText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      // Respect caseSensitive flag
+      const flags = pattern.caseSensitive ? 'g' : 'gi';
+      const regex = new RegExp(escapedFind, flags);
+      transformedText = transformedText.replace(regex, pattern.replaceText);
+    }
+    
+    return transformedText;
+  }
+
   private categorizeArticle(keywords: string[]): string {
     const categories = {
       'Technology': ['tech', 'ai', 'artificial intelligence', 'software', 'programming', 'digital'],
@@ -317,7 +332,7 @@ export class NewsService {
     try {
       console.log(`Starting basic curation with ${articles.length} articles`);
       
-      // Filter out negative keywords first
+      // Filter out negative keywords (global process - no user-specific replacements)
       const blockedKeywords = await storage.getKeywords();
       const blockedTerms = blockedKeywords
         .filter((k: any) => k.type === 'blocked')

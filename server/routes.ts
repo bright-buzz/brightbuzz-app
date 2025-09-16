@@ -187,11 +187,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.isAuthenticated() ? req.user.claims.sub : undefined;
       const preferences = await storage.getUserPreferences(userId);
       const articles = await storage.getArticles();
+      
+      // Apply replacement patterns first - fetch once and reuse
+      let replacementPatterns: any[] = [];
+      try {
+        replacementPatterns = await storage.getReplacementPatterns(userId);
+      } catch (error) {
+        console.error('Failed to fetch replacement patterns:', error);
+      }
+
+      const applyReplacementPatterns = (text: string): string => {
+        let transformedText = text;
+        
+        for (const pattern of replacementPatterns) {
+          // Escape user input for literal replacement to prevent ReDoS
+          const escapedFind = pattern.findText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          // Respect caseSensitive flag
+          const flags = pattern.caseSensitive ? 'g' : 'gi';
+          const regex = new RegExp(escapedFind, flags);
+          transformedText = transformedText.replace(regex, pattern.replaceText);
+        }
+        
+        return transformedText;
+      };
+
+      const transformedArticles = articles.map((article) => ({
+        ...article,
+        title: applyReplacementPatterns(article.title),
+        summary: applyReplacementPatterns(article.summary)
+      }));
+
       const blockedKeywords = await storage.getKeywordsByType('blocked');
       const blocked = blockedKeywords.map(kw => kw.keyword.toLowerCase());
       
-      // Simple filtering logic
-      const filtered = articles.filter(article => {
+      // Simple filtering logic after applying replacement patterns
+      const filtered = transformedArticles.filter(article => {
         // Check sentiment threshold
         if (article.sentiment < (preferences?.sentimentThreshold || 0.7)) {
           return false;
@@ -226,15 +256,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/filter-preview", async (req, res) => {
+  app.post("/api/filter-preview", async (req: any, res) => {
     try {
       const { sentimentThreshold } = req.body;
+      const userId = req.isAuthenticated() ? req.user.claims.sub : undefined;
       const articles = await storage.getArticles();
+      
+      // Apply replacement patterns first - fetch once and reuse
+      let replacementPatterns: any[] = [];
+      try {
+        replacementPatterns = await storage.getReplacementPatterns(userId);
+      } catch (error) {
+        console.error('Failed to fetch replacement patterns:', error);
+      }
+
+      const applyReplacementPatterns = (text: string): string => {
+        let transformedText = text;
+        
+        for (const pattern of replacementPatterns) {
+          // Escape user input for literal replacement to prevent ReDoS
+          const escapedFind = pattern.findText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          // Respect caseSensitive flag
+          const flags = pattern.caseSensitive ? 'g' : 'gi';
+          const regex = new RegExp(escapedFind, flags);
+          transformedText = transformedText.replace(regex, pattern.replaceText);
+        }
+        
+        return transformedText;
+      };
+
+      const transformedArticles = articles.map((article) => ({
+        ...article,
+        title: applyReplacementPatterns(article.title),
+        summary: applyReplacementPatterns(article.summary)
+      }));
+
       const blockedKeywords = await storage.getKeywordsByType('blocked');
       const blocked = blockedKeywords.map(kw => kw.keyword.toLowerCase());
       
-      // Simple filtering logic with custom threshold
-      const filtered = articles.filter(article => {
+      // Simple filtering logic with custom threshold after applying replacement patterns
+      const filtered = transformedArticles.filter(article => {
         // Check sentiment threshold
         if (article.sentiment < (sentimentThreshold || 0.7)) {
           return false;
