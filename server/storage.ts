@@ -1,4 +1,4 @@
-import { type Article, type InsertArticle, type Keyword, type InsertKeyword, type UserPreferences, type InsertUserPreferences, type Podcast, type InsertPodcast, type User, type UpsertUser } from "@shared/schema";
+import { type Article, type InsertArticle, type Keyword, type InsertKeyword, type ReplacementPattern, type InsertReplacementPattern, type UserPreferences, type InsertUserPreferences, type Podcast, type InsertPodcast, type User, type UpsertUser } from "@shared/schema";
 import { randomUUID } from "crypto";
 
 export interface IStorage {
@@ -19,6 +19,11 @@ export interface IStorage {
   getKeywordsByType(type: string): Promise<Keyword[]>;
   deleteKeyword(id: string): Promise<boolean>;
   
+  // Replacement Patterns
+  createReplacementPattern(pattern: InsertReplacementPattern): Promise<ReplacementPattern>;
+  getReplacementPatterns(userId?: string): Promise<ReplacementPattern[]>;
+  deleteReplacementPattern(id: string): Promise<boolean>;
+  
   // User Preferences
   getUserPreferences(userId?: string): Promise<UserPreferences | undefined>;
   updateUserPreferences(preferences: Partial<UserPreferences>, userId?: string): Promise<UserPreferences>;
@@ -34,6 +39,7 @@ export interface IStorage {
 export class MemStorage implements IStorage {
   private articles: Map<string, Article>;
   private keywords: Map<string, Keyword>;
+  private replacementPatterns: Map<string, ReplacementPattern>;
   private podcasts: Map<string, Podcast>;
   private users: Map<string, User>;
   private userPreferences: UserPreferences | undefined;
@@ -41,6 +47,7 @@ export class MemStorage implements IStorage {
   constructor() {
     this.articles = new Map();
     this.keywords = new Map();
+    this.replacementPatterns = new Map();
     this.podcasts = new Map();
     this.users = new Map();
     this.userPreferences = {
@@ -130,6 +137,25 @@ export class MemStorage implements IStorage {
 
   async deleteKeyword(id: string): Promise<boolean> {
     return this.keywords.delete(id);
+  }
+
+  async createReplacementPattern(insertPattern: InsertReplacementPattern): Promise<ReplacementPattern> {
+    const id = randomUUID();
+    const pattern: ReplacementPattern = { ...insertPattern, id };
+    this.replacementPatterns.set(id, pattern);
+    return pattern;
+  }
+
+  async getReplacementPatterns(userId?: string): Promise<ReplacementPattern[]> {
+    const patterns = Array.from(this.replacementPatterns.values());
+    if (userId) {
+      return patterns.filter(pattern => pattern.userId === userId);
+    }
+    return patterns;
+  }
+
+  async deleteReplacementPattern(id: string): Promise<boolean> {
+    return this.replacementPatterns.delete(id);
   }
 
   async getUserPreferences(): Promise<UserPreferences | undefined> {

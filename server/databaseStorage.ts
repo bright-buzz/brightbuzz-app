@@ -2,6 +2,7 @@ import {
   users,
   articles,
   keywords,
+  replacementPatterns,
   userPreferences,
   podcasts,
   type User,
@@ -10,6 +11,8 @@ import {
   type InsertArticle,
   type Keyword,
   type InsertKeyword,
+  type ReplacementPattern,
+  type InsertReplacementPattern,
   type UserPreferences,
   type InsertUserPreferences,
   type Podcast,
@@ -101,6 +104,33 @@ export class DatabaseStorage implements IStorage {
     const result = await db
       .delete(keywords)
       .where(eq(keywords.id, id));
+    return result.rowCount > 0;
+  }
+
+  // Replacement Patterns
+  async createReplacementPattern(insertPattern: InsertReplacementPattern): Promise<ReplacementPattern> {
+    const [pattern] = await db
+      .insert(replacementPatterns)
+      .values(insertPattern)
+      .returning();
+    return pattern;
+  }
+
+  async getReplacementPatterns(userId?: string): Promise<ReplacementPattern[]> {
+    if (userId) {
+      return await db
+        .select()
+        .from(replacementPatterns)
+        .where(eq(replacementPatterns.userId, userId));
+    } else {
+      return await db.select().from(replacementPatterns);
+    }
+  }
+
+  async deleteReplacementPattern(id: string): Promise<boolean> {
+    const result = await db
+      .delete(replacementPatterns)
+      .where(eq(replacementPatterns.id, id));
     return result.rowCount > 0;
   }
 
