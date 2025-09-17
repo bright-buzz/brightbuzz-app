@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,11 @@ import type { Podcast } from "@shared/schema";
 
 export function PodcastSection() {
   const [expandedPodcast, setExpandedPodcast] = useState<string | null>(null);
+  const [playingPodcast, setPlayingPodcast] = useState<string | null>(null);
+  const [currentTime, setCurrentTime] = useState<number>(0);
+  const [duration, setDuration] = useState<number>(0);
+  const [isPlaying, setIsPlaying] = useState<boolean>(false);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
   const { toast } = useToast();
 
   const { data: podcasts = [], isLoading } = useQuery<Podcast[]>({
@@ -54,6 +59,94 @@ export function PodcastSection() {
   const toggleTranscript = (podcastId: string) => {
     setExpandedPodcast(expandedPodcast === podcastId ? null : podcastId);
   };
+
+  const isValidAudioUrl = (url: string): boolean => {
+    // Check if it's a fake URL or invalid
+    return !!url && !url.includes('example.com') && (url.startsWith('data:audio/') || url.startsWith('http'));
+  };
+
+  const handlePlay = (podcast: Podcast) => {
+    if (!podcast.audioUrl || !isValidAudioUrl(podcast.audioUrl)) {
+      toast({
+        title: "Audio Not Available",
+        description: "Audio generation is currently limited due to API quotas. You can still read the transcript below.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (playingPodcast === podcast.id && isPlaying) {
+      // Pause current podcast
+      audioRef.current?.pause();
+      setIsPlaying(false);
+    } else {
+      // Stop any currently playing audio
+      if (audioRef.current) {
+        audioRef.current.pause();
+      }
+      
+      // Start new audio
+      audioRef.current = new Audio(podcast.audioUrl);
+      audioRef.current.addEventListener('loadedmetadata', () => {
+        setDuration(audioRef.current?.duration || 0);
+      });
+      
+      audioRef.current.addEventListener('timeupdate', () => {
+        setCurrentTime(audioRef.current?.currentTime || 0);
+      });
+      
+      audioRef.current.addEventListener('ended', () => {
+        setIsPlaying(false);
+        setPlayingPodcast(null);
+        setCurrentTime(0);
+      });
+      
+      audioRef.current.addEventListener('error', () => {
+        toast({
+          title: "Playback Error",
+          description: "Audio generation is currently limited. Please try the transcript instead.",
+          variant: "destructive"
+        });
+        setIsPlaying(false);
+        setPlayingPodcast(null);
+      });
+      
+      audioRef.current.play()
+        .then(() => {
+          setIsPlaying(true);
+          setPlayingPodcast(podcast.id);
+        })
+        .catch(() => {
+          toast({
+            title: "Playback Error",
+            description: "Audio generation is currently limited. Please try the transcript instead.",
+            variant: "destructive"
+          });
+        });
+    }
+  };
+
+  const handleProgressClick = (e: React.MouseEvent<HTMLDivElement>, podcast: Podcast) => {
+    if (!audioRef.current || playingPodcast !== podcast.id) return;
+    
+    const progressBar = e.currentTarget;
+    const rect = progressBar.getBoundingClientRect();
+    const percent = (e.clientX - rect.left) / rect.width;
+    const newTime = percent * duration;
+    
+    audioRef.current.currentTime = newTime;
+    setCurrentTime(newTime);
+  };
+
+  // Cleanup audio when component unmounts
+  useEffect(() => {
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+    };
+  }, []);
 
   if (isLoading) {
     return (
@@ -184,38 +277,66 @@ export function PodcastSection() {
                   )}
                 </div>
 
-                {/* Audio Player Simulation */}
+                {/* Audio Player */}
                 <div className="bg-slate-50 rounded-lg p-3 mb-3">
                   <div className="flex items-center space-x-3">
                     <Button
                       size="sm"
                       className="w-10 h-10 rounded-full bg-purple-600 hover:bg-purple-700"
-                      disabled={!podcast.audioUrl || (podcast.isProcessing || false)}
+                      disabled={podcast.isProcessing || !isValidAudioUrl(podcast.audioUrl || "")}
+                      onClick={() => handlePlay(podcast)}
                       data-testid={`button-play-${podcast.id}`}
                     >
-                      <Play className="h-4 w-4" />
+                      {playingPodcast === podcast.id && isPlaying ? (
+                        <Pause className="h-4 w-4" />
+                      ) : (
+                        <Play className="h-4 w-4" />
+                      )}
                     </Button>
                     <div className="flex-1">
-                      <div className="bg-slate-300 rounded-full h-2">
-                        <div className="bg-purple-600 h-2 rounded-full w-0"></div>
+                      <div 
+                        className="bg-slate-300 rounded-full h-2 cursor-pointer"
+                        onClick={(e) => handleProgressClick(e, podcast)}
+                      >
+                        <div 
+                          className="bg-purple-600 h-2 rounded-full transition-all duration-100"
+                          style={{ 
+                            width: playingPodcast === podcast.id && duration > 0 
+                              ? `${(currentTime / duration) * 100}%` 
+                              : '0%' 
+                          }}
+                        ></div>
                       </div>
                       <div className="flex justify-between text-xs text-slate-500 mt-1">
-                        <span>0:00</span>
-                        <span>{formatDuration(podcast.duration)}</span>
+                        <span>
+                          {playingPodcast === podcast.id 
+                            ? formatDuration(currentTime) 
+                            : '0:00'}
+                        </span>
+                        <span>
+                          {playingPodcast === podcast.id && duration > 0
+                            ? formatDuration(duration)
+                            : formatDuration(podcast.duration)}
+                        </span>
                       </div>
                     </div>
                     <Button
                       size="sm"
                       variant="ghost"
-                      disabled={!podcast.audioUrl || (podcast.isProcessing || false)}
+                      disabled={!podcast.audioUrl || !isValidAudioUrl(podcast.audioUrl || "") || (podcast.isProcessing || false)}
+                      onClick={() => {
+                        if (podcast.audioUrl && isValidAudioUrl(podcast.audioUrl)) {
+                          window.open(podcast.audioUrl, '_blank');
+                        }
+                      }}
                       data-testid={`button-download-${podcast.id}`}
                     >
                       <Download className="h-4 w-4" />
                     </Button>
                   </div>
-                  {!podcast.audioUrl && !podcast.isProcessing && (
+                  {(!podcast.audioUrl || !isValidAudioUrl(podcast.audioUrl || "")) && !podcast.isProcessing && (
                     <p className="text-xs text-slate-500 mt-2 text-center">
-                      Audio generation simulated - In production, this would contain the actual audio file
+                      Audio not available due to API quota limits - Read transcript below
                     </p>
                   )}
                 </div>

@@ -182,25 +182,43 @@ Thanks for tuning in to NewsFlow. We'll be back tomorrow with more curated news 
   }
 
   private async generateAudio(script: string): Promise<string> {
+    console.log("=== AUDIO GENERATION START ===");
+    console.log("Script length:", script.length);
+    console.log("OpenAI API Key available:", !!(process.env.OPENAI_API_KEY || process.env.OPENAI_API_KEY_ENV_VAR));
+    
     try {
-      // For now, we'll simulate audio generation
-      // In a real implementation, you would use OpenAI's TTS API:
-      /*
+      // Check if OpenAI API key is available
+      if (!process.env.OPENAI_API_KEY && !process.env.OPENAI_API_KEY_ENV_VAR) {
+        console.log("❌ OpenAI API key not available, using simulated audio URL");
+        return `https://example.com/podcasts/daily-${Date.now()}.mp3`;
+      }
+
+      console.log("✅ OpenAI API key found, attempting TTS generation...");
+      
+      // Generate audio using OpenAI TTS API
       const mp3 = await openai.audio.speech.create({
         model: "tts-1",
         voice: "nova",
         input: script,
       });
       
+      console.log("✅ TTS API call successful, processing audio buffer...");
       const buffer = Buffer.from(await mp3.arrayBuffer());
-      // Save to file storage and return URL
-      */
+      console.log("Audio buffer size:", buffer.length, "bytes");
       
-      // Simulated audio URL
-      return `https://example.com/podcasts/daily-${Date.now()}.mp3`;
+      // For now, we'll create a data URL (in production, you'd save to file storage)
+      const base64Audio = buffer.toString('base64');
+      const audioUrl = `data:audio/mpeg;base64,${base64Audio}`;
+      
+      console.log(`✅ Generated base64 audio URL, length: ${audioUrl.length} chars`);
+      console.log(`Audio URL preview: ${audioUrl.substring(0, 100)}...`);
+      return audioUrl;
     } catch (error) {
-      console.error("Failed to generate audio:", error);
-      return ""; // Return empty string if audio generation fails
+      console.error("❌ Failed to generate audio:", error);
+      console.error("Error details:", error instanceof Error ? error.message : String(error));
+      // Fallback to simulated URL if TTS fails
+      console.log("🔄 Falling back to simulated audio URL");
+      return `https://example.com/podcasts/daily-${Date.now()}.mp3`;
     }
   }
 
