@@ -415,7 +415,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Trigger news fetch
   app.post("/api/fetch-news", async (req, res) => {
     try {
-      await newsService.fetchLatestNews();
+      const { force } = req.body;
+      await newsService.fetchLatestNews(force || false);
       res.json({ success: true, message: "News fetch completed" });
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch news" });

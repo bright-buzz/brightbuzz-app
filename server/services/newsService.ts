@@ -24,9 +24,9 @@ export class NewsService {
     this.rssService = new RSSService();
   }
 
-  async fetchLatestNews(): Promise<void> {
+  async fetchLatestNews(forceRefresh: boolean = false): Promise<void> {
     const now = Date.now();
-    if (now - this.lastFetchTime < this.FETCH_INTERVAL) {
+    if (!forceRefresh && now - this.lastFetchTime < this.FETCH_INTERVAL) {
       return; // Too soon to fetch again
     }
 
