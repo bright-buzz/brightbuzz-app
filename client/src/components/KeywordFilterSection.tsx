@@ -59,6 +59,17 @@ export function KeywordFilterSection() {
     },
   });
 
+  const deleteKeywordMutation = useMutation({
+    mutationFn: (id: string) =>
+      apiRequest('DELETE', `/api/keywords/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/keywords/blocked'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/keywords/prioritized'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/filter-preview'] });
+      toast({ title: "Keyword deleted successfully" });
+    },
+  });
+
   const deleteReplacementPatternMutation = useMutation({
     mutationFn: (id: string) =>
       apiRequest('DELETE', `/api/replacement-patterns/${id}`),
@@ -168,10 +179,12 @@ export function KeywordFilterSection() {
                   <Badge 
                     key={keyword.id} 
                     variant="destructive" 
-                    className="bg-red-100 text-red-800"
+                    className="bg-red-100 text-red-800 cursor-pointer hover:bg-red-200 flex items-center gap-1"
+                    onClick={() => deleteKeywordMutation.mutate(keyword.id)}
                     data-testid={`badge-blocked-${keyword.keyword}`}
                   >
                     {keyword.keyword}
+                    <span className="ml-1 text-xs hover:text-red-900">×</span>
                   </Badge>
                 ))}
               </div>
@@ -206,10 +219,12 @@ export function KeywordFilterSection() {
                   <Badge 
                     key={keyword.id} 
                     variant="secondary" 
-                    className="bg-green-100 text-green-800"
+                    className="bg-green-100 text-green-800 cursor-pointer hover:bg-green-200 flex items-center gap-1"
+                    onClick={() => deleteKeywordMutation.mutate(keyword.id)}
                     data-testid={`badge-prioritized-${keyword.keyword}`}
                   >
                     {keyword.keyword}
+                    <span className="ml-1 text-xs hover:text-green-900">×</span>
                   </Badge>
                 ))}
               </div>
