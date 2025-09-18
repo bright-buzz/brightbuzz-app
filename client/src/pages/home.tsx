@@ -27,12 +27,14 @@ export default function Home() {
   // Manual refresh mutation
   const refreshMutation = useMutation({
     mutationFn: () => apiRequest('POST', '/api/fetch-news', { force: true }),
-    onSuccess: () => {
-      // Invalidate all relevant caches
-      queryClient.invalidateQueries({ queryKey: ['/api/articles'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/articles/curated'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/articles/top-five'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/filter-preview'] });
+    onSuccess: async () => {
+      // Refetch queries to get fresh data while preserving old data until new data arrives
+      await Promise.all([
+        queryClient.refetchQueries({ queryKey: ['/api/articles'] }),
+        queryClient.refetchQueries({ queryKey: ['/api/articles/curated'] }),
+        queryClient.refetchQueries({ queryKey: ['/api/articles/top-five'] }),
+        queryClient.refetchQueries({ queryKey: ['/api/filter-preview'] })
+      ]);
       
       toast({
         title: "News Refreshed",

@@ -64,7 +64,7 @@ export function TopFivePreviewSection() {
               key={article.id}
               className="flex items-start space-x-4 p-4 border border-slate-100 rounded-lg hover:border-slate-200 hover:shadow-sm transition-all cursor-pointer group"
               data-testid={`article-top-${index + 1}`}
-              onClick={() => window.open(article.url, '_blank')}
+              onClick={() => window.open(article.url, '_blank', 'noopener,noreferrer')}
             >
               <div className={`${index === 0 ? 'bg-primary' : 'bg-slate-600'} text-white text-sm font-bold w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0`}>
                 {index + 1}

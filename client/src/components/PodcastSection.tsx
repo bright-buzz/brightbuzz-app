@@ -326,7 +326,7 @@ export function PodcastSection() {
                       disabled={!podcast.audioUrl || !isValidAudioUrl(podcast.audioUrl || "") || (podcast.isProcessing || false)}
                       onClick={() => {
                         if (podcast.audioUrl && isValidAudioUrl(podcast.audioUrl)) {
-                          window.open(podcast.audioUrl, '_blank');
+                          window.open(podcast.audioUrl, '_blank', 'noopener,noreferrer');
                         }
                       }}
                       data-testid={`button-download-${podcast.id}`}

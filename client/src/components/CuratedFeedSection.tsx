@@ -3,19 +3,29 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Star, Crown, Heart, Bookmark, Eye } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import type { Article } from "@shared/schema";
 
 export function CuratedFeedSection() {
   const [visibleCount, setVisibleCount] = useState(5);
   const MAX_ARTICLES = 30;
+  const persistedVisibleCount = useRef(5); // Persist across re-renders
   
   const { data: articles = [], isLoading } = useQuery<Article[]>({
     queryKey: ['/api/articles/curated'],
   });
 
+  // Restore persisted visible count when articles data changes (use articles as dependency to trigger on refetch)
+  useEffect(() => {
+    if (articles.length > 0) {
+      setVisibleCount(persistedVisibleCount.current);
+    }
+  }, [articles]);
+
   const handleLoadMore = () => {
-    setVisibleCount(prev => Math.min(prev + 4, MAX_ARTICLES));
+    const newCount = Math.min(visibleCount + 4, MAX_ARTICLES);
+    setVisibleCount(newCount);
+    persistedVisibleCount.current = newCount; // Persist the choice
   };
 
   if (isLoading) {
@@ -69,7 +79,7 @@ export function CuratedFeedSection() {
             <article 
               className="lg:col-span-2 group cursor-pointer"
               data-testid={`article-featured-${featuredArticle.id}`}
-              onClick={() => window.open(featuredArticle.url, '_blank')}
+              onClick={() => window.open(featuredArticle.url, '_blank', 'noopener,noreferrer')}
             >
               <div className="relative mb-4">
                 {featuredArticle.imageUrl && (
@@ -122,7 +132,7 @@ export function CuratedFeedSection() {
               key={article.id}
               className="group cursor-pointer p-4 border border-slate-100 rounded-lg hover:border-slate-200 hover:shadow-sm transition-all"
               data-testid={`article-curated-${article.id}`}
-              onClick={() => window.open(article.url, '_blank')}
+              onClick={() => window.open(article.url, '_blank', 'noopener,noreferrer')}
             >
               <div className="flex space-x-3">
                 {article.imageUrl && (
