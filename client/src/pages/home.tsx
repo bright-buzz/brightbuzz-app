@@ -30,6 +30,8 @@ export default function Home() {
     onSuccess: () => {
       // Invalidate all relevant caches
       queryClient.invalidateQueries({ queryKey: ['/api/articles'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/articles/curated'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/articles/top-five'] });
       queryClient.invalidateQueries({ queryKey: ['/api/filter-preview'] });
       
       toast({
