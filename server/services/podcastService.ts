@@ -195,11 +195,28 @@ Thanks for tuning in to NewsFlow. We'll be back tomorrow with more curated news 
 
       console.log("✅ OpenAI API key found, attempting TTS generation...");
       
+      // Truncate script to fit within OpenAI TTS 4096 character limit
+      let ttsScript = script;
+      if (script.length > 4096) {
+        console.log(`⚠️ Script too long (${script.length} chars), truncating to 4096...`);
+        // Find a good breaking point near 4000 characters to avoid cutting mid-sentence
+        let breakPoint = script.lastIndexOf('.', 4000);
+        if (breakPoint === -1) breakPoint = script.lastIndexOf(' ', 4000);
+        if (breakPoint === -1) breakPoint = 4000;
+        
+        ttsScript = script.substring(0, breakPoint);
+        // Add a proper ending if we had to truncate
+        if (breakPoint < script.length - 100) {
+          ttsScript += "\n\nThat's today's NewsFlow digest. Thanks for listening, and we'll be back tomorrow with more news designed for professionals like you.";
+        }
+        console.log(`✅ Truncated script to ${ttsScript.length} characters`);
+      }
+      
       // Generate audio using OpenAI TTS API
       const mp3 = await openai.audio.speech.create({
         model: "tts-1",
         voice: "nova",
-        input: script,
+        input: ttsScript,
       });
       
       console.log("✅ TTS API call successful, processing audio buffer...");

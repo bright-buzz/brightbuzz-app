@@ -19,7 +19,7 @@ import {
   type InsertPodcast,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq } from "drizzle-orm";
+import { eq, desc } from "drizzle-orm";
 import type { IStorage } from "./storage";
 
 export class DatabaseStorage implements IStorage {
@@ -183,7 +183,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getPodcasts(): Promise<Podcast[]> {
-    return await db.select().from(podcasts);
+    return await db.select().from(podcasts).orderBy(desc(podcasts.createdAt)).limit(3);
   }
 
   async getPodcast(id: string): Promise<Podcast | undefined> {

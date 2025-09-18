@@ -184,7 +184,7 @@ export class MemStorage implements IStorage {
   async getPodcasts(): Promise<Podcast[]> {
     return Array.from(this.podcasts.values()).sort((a, b) => 
       new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-    );
+    ).slice(0, 3); // Limit to 3 most recent podcasts
   }
 
   async getPodcast(id: string): Promise<Podcast | undefined> {
