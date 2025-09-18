@@ -8,13 +8,14 @@ import type { Article } from "@shared/schema";
 
 export function CuratedFeedSection() {
   const [visibleCount, setVisibleCount] = useState(5);
+  const MAX_ARTICLES = 30;
   
   const { data: articles = [], isLoading } = useQuery<Article[]>({
     queryKey: ['/api/articles/curated'],
   });
 
   const handleLoadMore = () => {
-    setVisibleCount(prev => prev + 4);
+    setVisibleCount(prev => Math.min(prev + 4, MAX_ARTICLES));
   };
 
   if (isLoading) {
@@ -44,7 +45,7 @@ export function CuratedFeedSection() {
   }
 
   const featuredArticle = articles[0];
-  const otherArticles = articles.slice(1, visibleCount);
+  const otherArticles = articles.slice(1, Math.min(visibleCount, MAX_ARTICLES));
 
   return (
     <section className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
@@ -152,7 +153,7 @@ export function CuratedFeedSection() {
           ))}
         </div>
         
-        {articles.length > visibleCount && (
+        {articles.length > visibleCount && visibleCount < MAX_ARTICLES && (
           <div className="mt-6 text-center">
             <Button 
               onClick={handleLoadMore}

@@ -101,7 +101,8 @@ export class MemStorage implements IStorage {
   async getCuratedArticles(): Promise<Article[]> {
     return Array.from(this.articles.values())
       .filter(article => article.isCurated)
-      .sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime());
+      .sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime())
+      .slice(0, 30); // Limit to 30 curated articles maximum
   }
 
   async getTopFiveArticles(): Promise<Article[]> {
