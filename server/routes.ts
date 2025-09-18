@@ -426,9 +426,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Podcast endpoints
   app.get("/api/podcasts", async (req, res) => {
     try {
+      console.log("=== PODCAST ROUTE CALLED ===");
       const podcasts = await podcastService.getAllPodcasts();
+      console.log("✅ Podcasts retrieved successfully in route");
       res.json(podcasts);
     } catch (error) {
+      console.error("❌ Error in podcast route:", error);
+      console.error("Error message:", error instanceof Error ? error.message : String(error));
+      console.error("Error stack:", error instanceof Error ? error.stack : "No stack trace");
       res.status(500).json({ message: "Failed to fetch podcasts" });
     }
   });

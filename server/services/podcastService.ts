@@ -250,7 +250,16 @@ Thanks for tuning in to NewsFlow. We'll be back tomorrow with more curated news 
   }
 
   async getAllPodcasts() {
-    return await storage.getPodcasts();
+    try {
+      console.log("=== GETTING ALL PODCASTS ===");
+      const podcasts = await storage.getPodcasts();
+      console.log(`✅ Successfully retrieved ${podcasts.length} podcasts`);
+      return podcasts;
+    } catch (error) {
+      console.error("❌ Error getting podcasts:", error);
+      console.error("Error details:", error instanceof Error ? error.message : String(error));
+      throw error;
+    }
   }
 
   async regeneratePodcast(id: string): Promise<void> {
