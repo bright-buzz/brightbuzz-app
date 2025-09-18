@@ -47,6 +47,13 @@ Preferred communication style: Simple, everyday language.
   - Complete fallback systems for both article curation and podcast generation
   - Real news content flowing through all features from diverse sources
 
+- **Manual News Refresh Functionality (September 2025)**: Added on-demand news refresh capability
+  - Implemented floating refresh button with spinning loading animation and toast feedback
+  - Force refresh option bypasses automatic 15-minute rate limiting for immediate updates
+  - React Query mutation pattern with comprehensive cache invalidation for all news sections
+  - Users can now manually refresh news feed any time without waiting for scheduled updates
+  - Seamless integration with existing automatic refresh system every 15 minutes
+
 ## System Architecture
 
 ### Frontend Architecture
