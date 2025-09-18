@@ -1,17 +1,20 @@
 import { useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { AppHeader } from "@/components/AppHeader";
 import { CuratedFeedSection } from "@/components/CuratedFeedSection";
 import { TopFivePreviewSection } from "@/components/TopFivePreviewSection";
 import { PodcastSection } from "@/components/PodcastSection";
 import { FilterEffectivenessSection } from "@/components/FilterEffectivenessSection";
 import { Button } from "@/components/ui/button";
-import { Settings } from "lucide-react";
+import { Settings, RefreshCw } from "lucide-react";
 import { Link } from "wouter";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 import type { FilterPreview } from "@shared/schema";
 
 export default function Home() {
+  const { toast } = useToast();
+  
   const { data: preferences } = useQuery({
     queryKey: ['/api/preferences'],
   });
@@ -19,6 +22,28 @@ export default function Home() {
   const { data: filterStats } = useQuery<FilterPreview>({
     queryKey: ['/api/filter-preview'],
     enabled: !!preferences,
+  });
+
+  // Manual refresh mutation
+  const refreshMutation = useMutation({
+    mutationFn: () => apiRequest('POST', '/api/fetch-news', { force: true }),
+    onSuccess: () => {
+      // Invalidate all relevant caches
+      queryClient.invalidateQueries({ queryKey: ['/api/articles'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/filter-preview'] });
+      
+      toast({
+        title: "News Refreshed",
+        description: "Latest news has been fetched and feed updated.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Refresh Failed",
+        description: "Failed to fetch latest news. Please try again.",
+        variant: "destructive",
+      });
+    },
   });
 
   // Fetch initial news data
@@ -50,8 +75,21 @@ export default function Home() {
         <FilterEffectivenessSection />
       </main>
 
-      {/* Floating Action Button */}
-      <div className="fixed bottom-6 right-6 z-40">
+      {/* Floating Action Buttons */}
+      <div className="fixed bottom-6 right-6 z-40 flex flex-col gap-3">
+        {/* Refresh Button */}
+        <Button
+          size="lg"
+          variant="secondary"
+          className="w-14 h-14 rounded-full shadow-lg hover:shadow-xl transition-all duration-300"
+          onClick={() => refreshMutation.mutate()}
+          disabled={refreshMutation.isPending}
+          data-testid="button-refresh-news"
+        >
+          <RefreshCw className={`h-5 w-5 ${refreshMutation.isPending ? 'animate-spin' : ''}`} />
+        </Button>
+        
+        {/* Settings Button */}
         <Link href="/settings">
           <Button
             size="lg"
