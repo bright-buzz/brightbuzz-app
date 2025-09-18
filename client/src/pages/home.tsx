@@ -11,6 +11,7 @@ import { Link } from "wouter";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { FilterPreview } from "@shared/schema";
+import { useMemo } from "react";
 
 export default function Home() {
   const { toast } = useToast();
@@ -23,6 +24,47 @@ export default function Home() {
     queryKey: ['/api/filter-preview'],
     enabled: !!preferences,
   });
+
+  // Query for all articles to check for duplicates
+  const { data: allArticles } = useQuery({
+    queryKey: ['/api/articles'],
+    enabled: !!preferences,
+  });
+
+  // Query for curated articles
+  const { data: curatedArticles } = useQuery({
+    queryKey: ['/api/articles/curated'],
+    enabled: !!preferences,
+  });
+
+  // Query for top five articles
+  const { data: topFiveArticles } = useQuery({
+    queryKey: ['/api/articles/top-five'],
+    enabled: !!preferences,
+  });
+
+  // Deduplicate articles by URL or title to prevent duplicate content
+  const deduplicatedCurated = useMemo(() => {
+    if (!curatedArticles) return undefined;
+    const seen = new Set();
+    return curatedArticles.filter((article: any) => {
+      const key = article.url || article.title;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }, [curatedArticles]);
+
+  const deduplicatedTopFive = useMemo(() => {
+    if (!topFiveArticles) return undefined;
+    const seen = new Set();
+    return topFiveArticles.filter((article: any) => {
+      const key = article.url || article.title;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }, [topFiveArticles]);
 
   // Manual refresh mutation
   const refreshMutation = useMutation({
@@ -73,10 +115,10 @@ export default function Home() {
       <AppHeader filteredCount={filterStats?.stats?.filteredCount || 0} />
       
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
-        <CuratedFeedSection />
-        <TopFivePreviewSection />
+        <CuratedFeedSection articles={curatedArticles} />
+        <TopFivePreviewSection articles={topFiveArticles} />
         <PodcastSection />
-        <FilterEffectivenessSection />
+        <FilterEffectivenessSection stats={filterStats} />
       </main>
 
       {/* Floating Action Buttons */}
