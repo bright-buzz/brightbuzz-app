@@ -155,7 +155,7 @@ Format the script with clear sections: [INTRO], [STORY 1], [STORY 2], etc., [OUT
     });
 
     let script = `[INTRO]
-Good morning, and welcome to your daily NewsFlow digest for ${date}. I'm here to keep you informed with the latest business and technology news that matters to your career and professional growth. Today, we're covering ${articles.length} carefully curated stories designed to inspire and inform without the anxiety. Let's dive in.
+Good morning, and welcome to your daily BrightBuzz digest for ${date}. I'm here to keep you informed with the latest business and technology news that matters to your career and professional growth. Today, we're covering ${articles.length} carefully curated stories designed to inspire and inform without the anxiety. Let's dive in.
 
 `;
 
@@ -172,11 +172,11 @@ This development is particularly relevant for young professionals because it hig
     });
 
     script += `[OUTRO]
-That wraps up today's NewsFlow digest. We've covered ${articles.length} stories spanning business, technology, and career development - all filtered to help you stay informed while maintaining a positive outlook on your professional journey.
+That wraps up today's BrightBuzz digest. We've covered ${articles.length} stories spanning business, technology, and career development - all filtered to help you stay informed while maintaining a positive outlook on your professional journey.
 
 Remember, every challenge in the news represents an opportunity for innovation and growth. As a young professional, you're uniquely positioned to adapt, learn, and thrive in our rapidly changing world.
 
-Thanks for tuning in to NewsFlow. We'll be back tomorrow with more curated news designed specifically for ambitious professionals like you. Until then, stay curious, stay positive, and keep building your future.`;
+Thanks for tuning in to BrightBuzz. We'll be back tomorrow with more curated news designed specifically for ambitious professionals like you. Until then, stay curious, stay positive, and keep building your future.`;
 
     return script;
   }
@@ -207,7 +207,7 @@ Thanks for tuning in to NewsFlow. We'll be back tomorrow with more curated news 
         ttsScript = script.substring(0, breakPoint);
         // Add a proper ending if we had to truncate
         if (breakPoint < script.length - 100) {
-          ttsScript += "\n\nThat's today's NewsFlow digest. Thanks for listening, and we'll be back tomorrow with more news designed for professionals like you.";
+          ttsScript += "\n\nThat's today's BrightBuzz digest. Thanks for listening, and we'll be back tomorrow with more news designed for professionals like you.";
         }
         console.log(`✅ Truncated script to ${ttsScript.length} characters`);
       }

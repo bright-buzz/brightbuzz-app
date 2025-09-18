@@ -1,8 +1,8 @@
-# NewsFlow - AI-Curated News Platform
+# BrightBuzz - AI-Curated News Platform
 
 ## Overview
 
-NewsFlow is an AI-powered news curation platform that reduces information anxiety by intelligently filtering and curating news content from all categories. The application uses sentiment analysis and user-defined keywords to filter out anxiety-inducing content while presenting comprehensive news coverage across technology, business, world news, sports, entertainment, health, science, and more.
+BrightBuzz is an AI-powered news curation platform that reduces information anxiety by intelligently filtering and curating news content from all categories. The application uses sentiment analysis and user-defined keywords to filter out anxiety-inducing content while presenting comprehensive news coverage across technology, business, world news, sports, entertainment, health, science, and more.
 
 The platform features real-time news fetching from external APIs, AI-powered sentiment analysis using OpenAI's GPT-4o model, customizable keyword filtering, automated daily podcast generation, and a modern React-based interface with curated feeds, trending articles, and comprehensive settings management.
 

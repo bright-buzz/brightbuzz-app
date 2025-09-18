@@ -12,9 +12,9 @@ export default function Landing() {
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center space-x-3">
               <div className="w-8 h-8 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-sm">N</span>
+                <span className="text-white font-bold text-sm">B</span>
               </div>
-              <h1 className="text-xl font-bold text-slate-900">NewsFlow</h1>
+              <h1 className="text-xl font-bold text-slate-900">BrightBuzz</h1>
             </div>
             <Button 
               onClick={() => window.location.href = '/api/login'}
@@ -42,7 +42,7 @@ export default function Landing() {
             </h1>
             
             <p className="text-xl text-slate-600 mb-8 leading-relaxed">
-              NewsFlow curates news from all categories using AI to filter out anxiety-inducing content, 
+              BrightBuzz curates news from all categories using AI to filter out anxiety-inducing content, 
               keeping you informed across world news, technology, sports, entertainment, health, and more while protecting your mental health.
             </p>
             
@@ -148,9 +148,9 @@ export default function Landing() {
           <div className="text-center">
             <div className="flex items-center justify-center space-x-3 mb-4">
               <div className="w-8 h-8 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-sm">N</span>
+                <span className="text-white font-bold text-sm">B</span>
               </div>
-              <span className="text-xl font-bold text-white">NewsFlow</span>
+              <span className="text-xl font-bold text-white">BrightBuzz</span>
             </div>
             <p className="text-slate-400">
               AI-powered news curation across all categories

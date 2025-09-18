@@ -145,7 +145,7 @@ export class RSSService {
     this.parser = new Parser({
       timeout: 10000,
       headers: {
-        'User-Agent': 'NewsFlow RSS Reader 1.0'
+        'User-Agent': 'BrightBuzz RSS Reader 1.0'
       }
     });
   }
