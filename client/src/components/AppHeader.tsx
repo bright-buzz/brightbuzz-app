@@ -29,7 +29,7 @@ export function AppHeader({ filteredCount }: AppHeaderProps) {
               <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
                 <Newspaper className="text-white text-sm" />
               </div>
-              <h1 className="text-xl font-bold text-slate-900" data-testid="text-app-title">NewsFlow</h1>
+              <h1 className="text-xl font-bold text-slate-900" data-testid="text-app-title">BrightBuzz</h1>
             </div>
             <span className="text-sm text-slate-500 hidden sm:block">Stay informed, not overwhelmed.</span>
           </div>
