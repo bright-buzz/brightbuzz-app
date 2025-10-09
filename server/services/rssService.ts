@@ -62,6 +62,8 @@ export class RSSService {
     { url: 'https://feeds.cbsnews.com/CBSNews/latest/rss.xml', name: 'CBS News', category: 'News' },
     { url: 'https://feeds.feedburner.com/time/topstories', name: 'Time Magazine', category: 'News' },
     { url: 'https://www.newsweek.com/rss', name: 'Newsweek', category: 'News' },
+    { url: 'https://www.theatlantic.com/feed/all/', name: 'The Atlantic', category: 'News' },
+    { url: 'https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml', name: 'New York Times', category: 'News' },
     
     // Politics
     { url: 'https://feeds.reuters.com/reuters/politicsNews', name: 'Reuters Politics', category: 'Politics' },
