@@ -14,6 +14,7 @@ export const articles = pgTable("articles", {
   category: text("category").notNull(),
   readTime: integer("read_time").notNull(), // in minutes
   views: integer("views").default(0),
+  likes: integer("likes").default(0),
   sentiment: real("sentiment").notNull(), // 0-1 score
   keywords: jsonb("keywords").$type<string[]>().default([]),
   isCurated: boolean("is_curated").default(false),
@@ -64,9 +65,17 @@ export const userPreferences = pgTable("user_preferences", {
   realTimeFiltering: boolean("real_time_filtering").default(true),
 });
 
+export const userArticleLikes = pgTable("user_article_likes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  articleId: varchar("article_id").notNull().references(() => articles.id),
+  likedAt: timestamp("liked_at").defaultNow(),
+});
+
 export const insertArticleSchema = createInsertSchema(articles).omit({
   id: true,
   views: true,
+  likes: true,
 });
 
 export const insertKeywordSchema = createInsertSchema(keywords).omit({
@@ -129,3 +138,11 @@ export const upsertUserSchema = createInsertSchema(users).omit({
 
 export type UpsertUser = z.infer<typeof upsertUserSchema>;
 export type User = typeof users.$inferSelect;
+
+export const insertUserArticleLikeSchema = createInsertSchema(userArticleLikes).omit({
+  id: true,
+  likedAt: true,
+});
+
+export type UserArticleLike = typeof userArticleLikes.$inferSelect;
+export type InsertUserArticleLike = z.infer<typeof insertUserArticleLikeSchema>;

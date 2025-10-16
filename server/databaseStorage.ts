@@ -5,6 +5,7 @@ import {
   replacementPatterns,
   userPreferences,
   podcasts,
+  userArticleLikes,
   type User,
   type UpsertUser,
   type Article,
@@ -19,7 +20,7 @@ import {
   type InsertPodcast,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, and } from "drizzle-orm";
 import type { IStorage } from "./storage";
 
 export class DatabaseStorage implements IStorage {
@@ -78,6 +79,76 @@ export class DatabaseStorage implements IStorage {
       .where(eq(articles.id, id))
       .returning();
     return article;
+  }
+
+  // Article Likes
+  async likeArticle(articleId: string, userId: string): Promise<{ success: boolean; likes: number }> {
+    const existingLike = await db
+      .select()
+      .from(userArticleLikes)
+      .where(and(eq(userArticleLikes.userId, userId), eq(userArticleLikes.articleId, articleId)))
+      .limit(1);
+    
+    if (existingLike.length > 0) {
+      const article = await db.select().from(articles).where(eq(articles.id, articleId)).limit(1);
+      return { success: false, likes: article[0]?.likes || 0 };
+    }
+    
+    await db.insert(userArticleLikes).values({ userId, articleId });
+    
+    const [updatedArticle] = await db
+      .update(articles)
+      .set({ likes: db.$count(userArticleLikes, eq(userArticleLikes.articleId, articleId)) })
+      .where(eq(articles.id, articleId))
+      .returning();
+    
+    const count = await db.select().from(userArticleLikes).where(eq(userArticleLikes.articleId, articleId));
+    const likes = count.length;
+    await db.update(articles).set({ likes }).where(eq(articles.id, articleId));
+    
+    return { success: true, likes };
+  }
+
+  async unlikeArticle(articleId: string, userId: string): Promise<{ success: boolean; likes: number }> {
+    const existingLike = await db
+      .select()
+      .from(userArticleLikes)
+      .where(and(eq(userArticleLikes.userId, userId), eq(userArticleLikes.articleId, articleId)))
+      .limit(1);
+    
+    if (existingLike.length === 0) {
+      const article = await db.select().from(articles).where(eq(articles.id, articleId)).limit(1);
+      return { success: false, likes: article[0]?.likes || 0 };
+    }
+    
+    await db.delete(userArticleLikes).where(
+      and(eq(userArticleLikes.userId, userId), eq(userArticleLikes.articleId, articleId))
+    );
+    
+    const count = await db.select().from(userArticleLikes).where(eq(userArticleLikes.articleId, articleId));
+    const likes = count.length;
+    await db.update(articles).set({ likes }).where(eq(articles.id, articleId));
+    
+    return { success: true, likes };
+  }
+
+  async isArticleLikedByUser(articleId: string, userId: string): Promise<boolean> {
+    const existingLike = await db
+      .select()
+      .from(userArticleLikes)
+      .where(and(eq(userArticleLikes.userId, userId), eq(userArticleLikes.articleId, articleId)))
+      .limit(1);
+    
+    return existingLike.length > 0;
+  }
+
+  async getUserLikedArticles(userId: string): Promise<string[]> {
+    const likes = await db
+      .select({ articleId: userArticleLikes.articleId })
+      .from(userArticleLikes)
+      .where(eq(userArticleLikes.userId, userId));
+    
+    return likes.map(like => like.articleId);
   }
 
   // Keywords

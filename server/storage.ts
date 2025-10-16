@@ -13,6 +13,12 @@ export interface IStorage {
   getTopFiveArticles(): Promise<Article[]>;
   updateArticle(id: string, updates: Partial<Article>): Promise<Article | undefined>;
   
+  // Article Likes
+  likeArticle(articleId: string, userId: string): Promise<{ success: boolean; likes: number }>;
+  unlikeArticle(articleId: string, userId: string): Promise<{ success: boolean; likes: number }>;
+  isArticleLikedByUser(articleId: string, userId: string): Promise<boolean>;
+  getUserLikedArticles(userId: string): Promise<string[]>;
+  
   // Keywords
   createKeyword(keyword: InsertKeyword): Promise<Keyword>;
   getKeywords(): Promise<Keyword[]>;
@@ -43,6 +49,7 @@ export class MemStorage implements IStorage {
   private podcasts: Map<string, Podcast>;
   private users: Map<string, User>;
   private userPreferences: UserPreferences | undefined;
+  private userLikes: Map<string, Set<string>>; // Map of userId -> Set of articleIds
 
   constructor() {
     this.articles = new Map();
@@ -50,6 +57,7 @@ export class MemStorage implements IStorage {
     this.replacementPatterns = new Map();
     this.podcasts = new Map();
     this.users = new Map();
+    this.userLikes = new Map();
     this.userPreferences = {
       id: randomUUID(),
       userId: null,
@@ -87,6 +95,7 @@ export class MemStorage implements IStorage {
       keywords: (insertArticle.keywords as string[]) || [],
       id,
       views: 0,
+      likes: 0,
     };
     this.articles.set(id, article);
     return article;
@@ -119,6 +128,51 @@ export class MemStorage implements IStorage {
     const updatedArticle = { ...article, ...updates };
     this.articles.set(id, updatedArticle);
     return updatedArticle;
+  }
+
+  async likeArticle(articleId: string, userId: string): Promise<{ success: boolean; likes: number }> {
+    const article = this.articles.get(articleId);
+    if (!article) return { success: false, likes: 0 };
+    
+    let userLikeSet = this.userLikes.get(userId);
+    if (!userLikeSet) {
+      userLikeSet = new Set<string>();
+      this.userLikes.set(userId, userLikeSet);
+    }
+    
+    if (userLikeSet.has(articleId)) {
+      return { success: false, likes: article.likes || 0 };
+    }
+    
+    userLikeSet.add(articleId);
+    const newLikes = (article.likes || 0) + 1;
+    await this.updateArticle(articleId, { likes: newLikes });
+    return { success: true, likes: newLikes };
+  }
+
+  async unlikeArticle(articleId: string, userId: string): Promise<{ success: boolean; likes: number }> {
+    const article = this.articles.get(articleId);
+    if (!article) return { success: false, likes: 0 };
+    
+    const userLikeSet = this.userLikes.get(userId);
+    if (!userLikeSet || !userLikeSet.has(articleId)) {
+      return { success: false, likes: article.likes || 0 };
+    }
+    
+    userLikeSet.delete(articleId);
+    const newLikes = Math.max(0, (article.likes || 0) - 1);
+    await this.updateArticle(articleId, { likes: newLikes });
+    return { success: true, likes: newLikes };
+  }
+
+  async isArticleLikedByUser(articleId: string, userId: string): Promise<boolean> {
+    const userLikeSet = this.userLikes.get(userId);
+    return userLikeSet ? userLikeSet.has(articleId) : false;
+  }
+
+  async getUserLikedArticles(userId: string): Promise<string[]> {
+    const userLikeSet = this.userLikes.get(userId);
+    return userLikeSet ? Array.from(userLikeSet) : [];
   }
 
   async createKeyword(insertKeyword: InsertKeyword): Promise<Keyword> {
