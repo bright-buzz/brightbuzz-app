@@ -46,18 +46,23 @@ export default function Landing() {
               keeping you informed across world news, technology, sports, entertainment, health, and more while protecting your mental health.
             </p>
             
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-12">
-              <Button 
-                size="lg" 
-                onClick={() => window.location.href = '/api/login'}
-                className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 px-8 py-3 text-lg"
-                data-testid="button-get-started"
-              >
-                Get Started Free
-              </Button>
-              <Button variant="outline" size="lg" className="px-8 py-3 text-lg">
-                Learn More
-              </Button>
+            <div className="flex flex-col items-center justify-center gap-4 mb-4">
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+                <Button 
+                  size="lg" 
+                  onClick={() => window.location.href = '/api/login'}
+                  className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 px-8 py-3 text-lg"
+                  data-testid="button-get-started"
+                >
+                  Get Started Free
+                </Button>
+                <Button variant="outline" size="lg" className="px-8 py-3 text-lg">
+                  Learn More
+                </Button>
+              </div>
+              <p className="text-sm text-slate-500">
+                Sign in with Gmail, Apple, GitHub, X, or email
+              </p>
             </div>
 
             <div className="flex items-center justify-center space-x-8 text-sm text-slate-500">
@@ -130,14 +135,19 @@ export default function Landing() {
             <p className="text-lg text-slate-600 mb-8">
               Join thousands of readers who stay informed across all topics without the anxiety.
             </p>
-            <Button 
-              size="lg" 
-              onClick={() => window.location.href = '/api/login'}
-              className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 px-8 py-3 text-lg"
-              data-testid="button-cta-signup"
-            >
-              Start Your Free Account
-            </Button>
+            <div className="flex flex-col items-center gap-3">
+              <Button 
+                size="lg" 
+                onClick={() => window.location.href = '/api/login'}
+                className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 px-8 py-3 text-lg"
+                data-testid="button-cta-signup"
+              >
+                Start Your Free Account
+              </Button>
+              <p className="text-sm text-slate-500">
+                Sign in with Gmail, Apple, GitHub, X, or email
+              </p>
+            </div>
           </div>
         </section>
       </main>

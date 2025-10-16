@@ -12,6 +12,16 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
+- **Multiple Login Options Clarification (October 2025)**: Enhanced landing page to clearly communicate authentication options
+  - Updated landing page to explicitly show all available login methods: Gmail, Apple, GitHub, X (Twitter), and email/password
+  - Added helpful text below sign-in buttons: "Sign in with Gmail, Apple, GitHub, X, or email"
+  - Users now understand they have multiple secure authentication options through Replit Auth
+
+- **News Source Expansion (October 2025)**: Added premium news sources
+  - Added The Atlantic RSS feed for comprehensive news coverage
+  - Added New York Times homepage feed to complement existing NYT World and Politics feeds
+  - Now includes 82+ RSS feeds from diverse, reputable sources
+
 - **User Authentication with Replit Auth (August 2025)**: Completed secure authentication system
   - Integrated Replit OpenID Connect authentication for secure user login/logout
   - Added PostgreSQL database with users, sessions, and user preferences tables
@@ -19,6 +29,7 @@ Preferred communication style: Simple, everyday language.
   - Beautiful landing page for unauthenticated users with sign-in functionality
   - Enhanced app header with user profile dropdown and logout option
   - Seamless routing between landing page and authenticated app experience
+  - Supports multiple login methods: Google/Gmail, Apple, GitHub, X, and email/password
 
 - **Comprehensive News Coverage Expansion (August 2025)**: Expanded to all news categories
   - Added 40+ RSS feeds covering world news, politics, sports, entertainment, health, science, travel, environment, and more
