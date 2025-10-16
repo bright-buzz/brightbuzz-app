@@ -144,6 +144,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Article likes endpoints
+  app.post("/api/articles/:id/like", isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const userId = req.user.claims.sub;
+      const result = await storage.likeArticle(id, userId);
+      res.json(result);
+    } catch (error) {
+      console.error("Error liking article:", error);
+      res.status(500).json({ message: "Failed to like article" });
+    }
+  });
+
+  app.post("/api/articles/:id/unlike", isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const userId = req.user.claims.sub;
+      const result = await storage.unlikeArticle(id, userId);
+      res.json(result);
+    } catch (error) {
+      console.error("Error unliking article:", error);
+      res.status(500).json({ message: "Failed to unlike article" });
+    }
+  });
+
+  app.get("/api/articles/:id/liked", isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const userId = req.user.claims.sub;
+      const isLiked = await storage.isArticleLikedByUser(id, userId);
+      res.json({ isLiked });
+    } catch (error) {
+      console.error("Error checking like status:", error);
+      res.status(500).json({ message: "Failed to check like status" });
+    }
+  });
+
+  app.get("/api/user/liked-articles", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const likedArticleIds = await storage.getUserLikedArticles(userId);
+      res.json(likedArticleIds);
+    } catch (error) {
+      console.error("Error fetching liked articles:", error);
+      res.status(500).json({ message: "Failed to fetch liked articles" });
+    }
+  });
+
   // Keywords endpoints
   app.get("/api/keywords", async (req, res) => {
     try {
