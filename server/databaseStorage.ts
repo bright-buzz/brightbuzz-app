@@ -70,7 +70,9 @@ export class DatabaseStorage implements IStorage {
     return await db
       .select()
       .from(articles)
-      .where(eq(articles.isTopFive, true));
+      .where(eq(articles.isTopFive, true))
+      .orderBy(desc(articles.views))
+      .limit(5);
   }
 
   async updateArticle(id: string, updates: Partial<Article>): Promise<Article | undefined> {
