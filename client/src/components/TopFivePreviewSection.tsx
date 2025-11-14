@@ -1,7 +1,7 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ListOrdered, Clock, Eye, Heart, Bookmark, BookmarkCheck } from "lucide-react";
+import { ListOrdered, Clock, Bookmark, BookmarkCheck } from "lucide-react";
 import type { MouseEvent } from "react";
 import type { Article } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -143,14 +143,6 @@ export function TopFivePreviewSection() {
                     <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500">
                       <span>{article.source}</span>
                       <span>{article.readTime} min read</span>
-                      <span className="flex items-center space-x-1">
-                        <Eye className="h-3 w-3" />
-                        <span>{article.views} views</span>
-                      </span>
-                      <span className="flex items-center space-x-1">
-                        <Heart className="h-3 w-3 text-red-500" />
-                        <span>{Math.round(article.sentiment * 100)}% positive</span>
-                      </span>
                       <Button
                         variant="ghost"
                         size="sm"

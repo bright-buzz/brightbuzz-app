@@ -2,7 +2,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Star, Crown, Heart, Bookmark, BookmarkCheck, Eye } from "lucide-react";
+import { Star, Crown, Bookmark, BookmarkCheck } from "lucide-react";
 import { useState, useEffect, useRef, type MouseEvent } from "react";
 import type { Article } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -167,10 +167,6 @@ export function CuratedFeedSection() {
                 <div className="flex items-center space-x-3">
                   <span>{featuredArticle.source}</span>
                   <span>{featuredArticle.readTime} min read</span>
-                  <span className="flex items-center space-x-1">
-                    <Heart className="h-3 w-3 text-red-500" />
-                    <span>{Math.round(featuredArticle.sentiment * 100)}% positive</span>
-                  </span>
                 </div>
                 <Button 
                   variant="ghost" 
@@ -221,25 +217,19 @@ export function CuratedFeedSection() {
                   </p>
                   <div className="flex items-center justify-between text-xs text-slate-500">
                     <span>{article.source}</span>
-                    <div className="flex items-center space-x-2">
-                      <span className="flex items-center space-x-1">
-                        <Heart className="h-3 w-3 text-red-500" />
-                        <span>{Math.round(article.sentiment * 100)}%</span>
-                      </span>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-6 px-2 hover:bg-slate-100"
-                        onClick={(e) => handleSave(e, article.id)}
-                        data-testid={`button-save-${article.id}`}
-                      >
-                        {savedArticleIds.has(article.id) ? (
-                          <BookmarkCheck className="h-3 w-3 fill-primary text-primary" />
-                        ) : (
-                          <Bookmark className="h-3 w-3" />
-                        )}
-                      </Button>
-                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 px-2 hover:bg-slate-100"
+                      onClick={(e) => handleSave(e, article.id)}
+                      data-testid={`button-save-${article.id}`}
+                    >
+                      {savedArticleIds.has(article.id) ? (
+                        <BookmarkCheck className="h-3 w-3 fill-primary text-primary" />
+                      ) : (
+                        <Bookmark className="h-3 w-3" />
+                      )}
+                    </Button>
                   </div>
                 </div>
               </div>
