@@ -1,8 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
+import { Link } from "wouter";
 import { AppHeader } from "@/components/AppHeader";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Bookmark, ExternalLink, Clock, BookmarkX } from "lucide-react";
+import { Bookmark, ExternalLink, Clock, BookmarkX, ArrowLeft } from "lucide-react";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -40,6 +41,13 @@ export default function Saved() {
       
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
+          <Link href="/">
+            <Button variant="ghost" size="sm" data-testid="button-back-home" className="mb-4">
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back to Home
+            </Button>
+          </Link>
+          
           <h1 className="text-3xl font-bold text-slate-900 flex items-center gap-2">
             <Bookmark className="h-8 w-8 text-blue-600" />
             Saved Articles

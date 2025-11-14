@@ -13,7 +13,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 interface AppHeaderProps {
-  filteredCount: number;
+  filteredCount?: number;
 }
 
 export function AppHeader({ filteredCount }: AppHeaderProps) {
@@ -35,12 +35,14 @@ export function AppHeader({ filteredCount }: AppHeaderProps) {
           </div>
           
           <div className="flex items-center space-x-4">
-            <div className="hidden md:flex items-center space-x-2 bg-slate-100 rounded-full px-3 py-1">
-              <Shield className="text-secondary text-sm" />
-              <span className="text-sm font-medium text-slate-700" data-testid="text-filtered-count">
-                {filteredCount} articles filtered today
-              </span>
-            </div>
+            {filteredCount !== undefined && (
+              <div className="hidden md:flex items-center space-x-2 bg-slate-100 rounded-full px-3 py-1">
+                <Shield className="text-secondary text-sm" />
+                <span className="text-sm font-medium text-slate-700" data-testid="text-filtered-count">
+                  {filteredCount} articles filtered today
+                </span>
+              </div>
+            )}
             
             <Link href="/saved">
               <Button 
