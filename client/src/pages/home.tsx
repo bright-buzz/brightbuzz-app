@@ -27,21 +27,22 @@ export default function Home() {
   // Manual refresh mutation
   const refreshMutation = useMutation({
     mutationFn: () => apiRequest('POST', '/api/fetch-news', { force: true }),
-    onSuccess: async () => {
-      // Refetch queries to get fresh data while preserving old data until new data arrives
-      await Promise.all([
-        queryClient.refetchQueries({ queryKey: ['/api/articles'] }),
-        queryClient.refetchQueries({ queryKey: ['/api/articles/curated'] }),
-        queryClient.refetchQueries({ queryKey: ['/api/articles/top-five'] }),
-        queryClient.refetchQueries({ queryKey: ['/api/filter-preview'] })
-      ]);
+    onSuccess: () => {
+      console.log('Refresh mutation succeeded, invalidating queries...');
+      // Invalidate queries to trigger refetch
+      queryClient.invalidateQueries({ queryKey: ['/api/articles'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/articles/curated'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/articles/top-five'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/filter-preview'] });
       
+      console.log('Showing toast notification');
       toast({
         title: "News Refreshed",
         description: "Latest news has been fetched and feed updated.",
       });
     },
-    onError: () => {
+    onError: (error) => {
+      console.error('Refresh mutation failed:', error);
       toast({
         title: "Refresh Failed",
         description: "Failed to fetch latest news. Please try again.",
@@ -55,6 +56,13 @@ export default function Home() {
     const fetchNews = async () => {
       try {
         await apiRequest('POST', '/api/fetch-news');
+        // Invalidate article queries to refetch with new data
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: ['/api/articles'] }),
+          queryClient.invalidateQueries({ queryKey: ['/api/articles/curated'] }),
+          queryClient.invalidateQueries({ queryKey: ['/api/articles/top-five'] }),
+          queryClient.invalidateQueries({ queryKey: ['/api/filter-preview'] })
+        ]);
       } catch (error) {
         console.error('Failed to fetch initial news:', error);
       }
