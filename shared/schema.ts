@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, real, boolean, jsonb, timestamp, index } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, real, boolean, jsonb, timestamp, index, unique } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -78,6 +78,19 @@ export const userSavedArticles = pgTable("user_saved_articles", {
   articleId: varchar("article_id").notNull().references(() => articles.id),
   savedAt: timestamp("saved_at").defaultNow(),
 });
+
+export const articleFeedback = pgTable("article_feedback", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  articleId: varchar("article_id").notNull().references(() => articles.id),
+  feedback: text("feedback").notNull(), // 'thumbs_up' or 'thumbs_down'
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  unique("unique_user_article_feedback").on(table.userId, table.articleId),
+  index("idx_feedback_user_id").on(table.userId),
+  index("idx_feedback_article_id").on(table.articleId),
+]);
 
 export const insertArticleSchema = createInsertSchema(articles).omit({
   id: true,
@@ -161,3 +174,25 @@ export const insertUserSavedArticleSchema = createInsertSchema(userSavedArticles
 
 export type UserSavedArticle = typeof userSavedArticles.$inferSelect;
 export type InsertUserSavedArticle = z.infer<typeof insertUserSavedArticleSchema>;
+
+export const insertArticleFeedbackSchema = createInsertSchema(articleFeedback).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  feedback: z.enum(['thumbs_up', 'thumbs_down']),
+});
+
+export type ArticleFeedback = typeof articleFeedback.$inferSelect;
+export type InsertArticleFeedback = z.infer<typeof insertArticleFeedbackSchema>;
+
+// Feedback aggregates for personalization
+export interface UserFeedbackProfile {
+  totalFeedback: number;
+  thumbsUpCount: number;
+  thumbsDownCount: number;
+  likedCategories: Record<string, number>; // category -> count
+  dislikedCategories: Record<string, number>;
+  likedSources: Record<string, number>; // source -> count
+  dislikedSources: Record<string, number>;
+}
