@@ -11,14 +11,17 @@ import { useAuth } from "@/hooks/useAuth";
 import { FeedbackButtons } from "@/components/FeedbackButtons";
 
 export function CuratedFeedSection() {
-  const [visibleCount, setVisibleCount] = useState(5);
-  const MAX_ARTICLES = 30;
-  const persistedVisibleCount = useRef(5); // Persist across re-renders
+  const ARTICLES_PER_PAGE = 20;
+  const [visibleCount, setVisibleCount] = useState(ARTICLES_PER_PAGE);
   const { toast } = useToast();
   const { isAuthenticated } = useAuth();
   
+  const { data: preferences } = useQuery({
+    queryKey: ['/api/preferences'],
+  });
+
   const { data: articles = [], isLoading } = useQuery<Article[]>({
-    queryKey: ['/api/articles/curated'],
+    queryKey: ['/api/articles/filtered'],
   });
 
   const { data: savedArticlesData = [] } = useQuery<Article[]>({
@@ -75,17 +78,13 @@ export function CuratedFeedSection() {
     }
   };
 
-  // Restore persisted visible count when articles data changes (use articles as dependency to trigger on refetch)
+  // Reset pagination when preferences change (filters updated)
   useEffect(() => {
-    if (articles.length > 0) {
-      setVisibleCount(persistedVisibleCount.current);
-    }
-  }, [articles]);
+    setVisibleCount(ARTICLES_PER_PAGE);
+  }, [preferences]);
 
   const handleLoadMore = () => {
-    const newCount = Math.min(visibleCount + 4, MAX_ARTICLES);
-    setVisibleCount(newCount);
-    persistedVisibleCount.current = newCount; // Persist the choice
+    setVisibleCount(prevCount => prevCount + ARTICLES_PER_PAGE);
   };
 
   if (isLoading) {
@@ -115,7 +114,8 @@ export function CuratedFeedSection() {
   }
 
   const featuredArticle = articles[0];
-  const otherArticles = articles.slice(1, Math.min(visibleCount, MAX_ARTICLES));
+  const otherArticles = articles.slice(1, visibleCount);
+  const hasMoreArticles = articles.length > visibleCount;
 
   return (
     <section className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
@@ -244,14 +244,14 @@ export function CuratedFeedSection() {
           ))}
         </div>
         
-        {articles.length > visibleCount && visibleCount < MAX_ARTICLES && (
+        {hasMoreArticles && (
           <div className="mt-6 text-center">
             <Button 
               onClick={handleLoadMore}
               className="bg-secondary hover:bg-emerald-700"
               data-testid="button-load-more-curated"
             >
-              Load More Curated Articles
+              Load More Articles ({articles.length - visibleCount} remaining)
             </Button>
           </div>
         )}
