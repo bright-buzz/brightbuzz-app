@@ -7,6 +7,7 @@ import {
   podcasts,
   userArticleLikes,
   userSavedArticles,
+  articleFeedback,
   type User,
   type UpsertUser,
   type Article,
@@ -21,7 +22,7 @@ import {
   type InsertPodcast,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, and } from "drizzle-orm";
+import { eq, desc, and, inArray } from "drizzle-orm";
 import type { IStorage } from "./storage";
 
 export class DatabaseStorage implements IStorage {
@@ -225,6 +226,99 @@ export class DatabaseStorage implements IStorage {
     }
     
     return savedArticles;
+  }
+
+  // Article Feedback
+  async saveFeedback(userId: string, articleId: string, feedback: 'thumbs_up' | 'thumbs_down'): Promise<{ success: boolean }> {
+    try {
+      await db
+        .insert(articleFeedback)
+        .values({ userId, articleId, feedback })
+        .onConflictDoUpdate({
+          target: [articleFeedback.userId, articleFeedback.articleId],
+          set: {
+            feedback,
+            updatedAt: new Date(),
+          },
+        });
+      return { success: true };
+    } catch (error) {
+      console.error('Error saving feedback:', error);
+      return { success: false };
+    }
+  }
+
+  async removeFeedback(userId: string, articleId: string): Promise<{ success: boolean }> {
+    try {
+      await db.delete(articleFeedback).where(
+        and(eq(articleFeedback.userId, userId), eq(articleFeedback.articleId, articleId))
+      );
+      return { success: true };
+    } catch (error) {
+      console.error('Error removing feedback:', error);
+      return { success: false };
+    }
+  }
+
+  async getFeedback(userId: string, articleId: string): Promise<{ feedback: 'thumbs_up' | 'thumbs_down' } | null> {
+    const [result] = await db
+      .select({ feedback: articleFeedback.feedback })
+      .from(articleFeedback)
+      .where(and(eq(articleFeedback.userId, userId), eq(articleFeedback.articleId, articleId)))
+      .limit(1);
+    
+    return result ? { feedback: result.feedback as 'thumbs_up' | 'thumbs_down' } : null;
+  }
+
+  async getUserFeedback(userId: string): Promise<Array<{ articleId: string; feedback: 'thumbs_up' | 'thumbs_down'; createdAt: Date }>> {
+    const results = await db
+      .select({
+        articleId: articleFeedback.articleId,
+        feedback: articleFeedback.feedback,
+        createdAt: articleFeedback.createdAt,
+      })
+      .from(articleFeedback)
+      .where(eq(articleFeedback.userId, userId))
+      .orderBy(desc(articleFeedback.createdAt));
+    
+    return results.map(r => ({
+      articleId: r.articleId,
+      feedback: r.feedback as 'thumbs_up' | 'thumbs_down',
+      createdAt: r.createdAt!,
+    }));
+  }
+
+  async getFeedbackSummaryForArticles(articleIds: string[]): Promise<Map<string, { thumbsUp: number; thumbsDown: number }>> {
+    if (articleIds.length === 0) {
+      return new Map();
+    }
+
+    const feedbackData = await db
+      .select({
+        articleId: articleFeedback.articleId,
+        feedback: articleFeedback.feedback,
+      })
+      .from(articleFeedback)
+      .where(inArray(articleFeedback.articleId, articleIds));
+    
+    // Build summary map
+    const summary = new Map<string, { thumbsUp: number; thumbsDown: number }>();
+    for (const articleId of articleIds) {
+      summary.set(articleId, { thumbsUp: 0, thumbsDown: 0 });
+    }
+    
+    for (const row of feedbackData) {
+      const stats = summary.get(row.articleId);
+      if (stats) {
+        if (row.feedback === 'thumbs_up') {
+          stats.thumbsUp++;
+        } else if (row.feedback === 'thumbs_down') {
+          stats.thumbsDown++;
+        }
+      }
+    }
+    
+    return summary;
   }
 
   // Keywords
