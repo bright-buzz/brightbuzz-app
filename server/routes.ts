@@ -121,7 +121,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const blockedKeywords = await storage.getKeywordsByType('blocked');
       const blocked = blockedKeywords.map(kw => kw.keyword.toLowerCase());
       
+      // Date threshold: only show articles from last 30 days
+      const thirtyDaysAgo = Date.now() - (30 * 24 * 60 * 60 * 1000);
+      
       const filtered = transformedArticles.filter(article => {
+        // Check date freshness (must be within last 30 days)
+        const publishedDate = new Date(article.publishedAt).getTime();
+        if (publishedDate < thirtyDaysAgo) {
+          return false;
+        }
+        
         // Check sentiment threshold
         if (article.sentiment < (preferences?.sentimentThreshold || 0.7)) {
           return false;
