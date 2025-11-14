@@ -270,6 +270,61 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Article Feedback endpoints
+  app.post("/api/articles/:id/feedback", isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const { feedback } = req.body;
+      const userId = req.user.claims.sub;
+      
+      // Validate feedback type
+      if (feedback !== 'thumbs_up' && feedback !== 'thumbs_down') {
+        return res.status(400).json({ message: "Invalid feedback type. Must be 'thumbs_up' or 'thumbs_down'" });
+      }
+      
+      const result = await storage.saveFeedback(userId, id, feedback);
+      res.json(result);
+    } catch (error) {
+      console.error("Error saving feedback:", error);
+      res.status(500).json({ message: "Failed to save feedback" });
+    }
+  });
+
+  app.delete("/api/articles/:id/feedback", isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const userId = req.user.claims.sub;
+      const result = await storage.removeFeedback(userId, id);
+      res.json(result);
+    } catch (error) {
+      console.error("Error removing feedback:", error);
+      res.status(500).json({ message: "Failed to remove feedback" });
+    }
+  });
+
+  app.get("/api/articles/:id/feedback", isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const userId = req.user.claims.sub;
+      const feedback = await storage.getFeedback(userId, id);
+      res.json(feedback || { feedback: null });
+    } catch (error) {
+      console.error("Error getting feedback:", error);
+      res.status(500).json({ message: "Failed to get feedback" });
+    }
+  });
+
+  app.get("/api/user/feedback", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const feedbackList = await storage.getUserFeedback(userId);
+      res.json(feedbackList);
+    } catch (error) {
+      console.error("Error getting user feedback:", error);
+      res.status(500).json({ message: "Failed to get user feedback" });
+    }
+  });
+
   // Keywords endpoints
   app.get("/api/keywords", async (req, res) => {
     try {
