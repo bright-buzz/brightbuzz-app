@@ -82,6 +82,70 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/articles/filtered", async (req: any, res) => {
+    try {
+      const userId = req.isAuthenticated() ? req.user.claims.sub : undefined;
+      const preferences = await storage.getUserPreferences(userId);
+      const curatedArticles = await storage.getCuratedArticles();
+      
+      // Apply replacement patterns if user is authenticated
+      let replacementPatterns: any[] = [];
+      if (userId) {
+        try {
+          replacementPatterns = await storage.getReplacementPatterns(userId);
+        } catch (error) {
+          console.error('Failed to fetch replacement patterns:', error);
+        }
+      }
+
+      const applyReplacementPatterns = (text: string): string => {
+        let transformedText = text;
+        
+        for (const pattern of replacementPatterns) {
+          const escapedFind = pattern.findText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          const flags = pattern.caseSensitive ? 'g' : 'gi';
+          const regex = new RegExp(escapedFind, flags);
+          transformedText = transformedText.replace(regex, pattern.replaceText);
+        }
+        
+        return transformedText;
+      };
+
+      const transformedArticles = curatedArticles.map((article) => ({
+        ...article,
+        title: applyReplacementPatterns(article.title),
+        summary: applyReplacementPatterns(article.summary)
+      }));
+
+      // Apply user filtering preferences
+      const blockedKeywords = await storage.getKeywordsByType('blocked');
+      const blocked = blockedKeywords.map(kw => kw.keyword.toLowerCase());
+      
+      const filtered = transformedArticles.filter(article => {
+        // Check sentiment threshold
+        if (article.sentiment < (preferences?.sentimentThreshold || 0.7)) {
+          return false;
+        }
+        
+        // Check blocked keywords
+        const articleText = `${article.title} ${article.summary}`.toLowerCase();
+        const hasBlockedKeyword = blocked.some(blockedTerm => 
+          articleText.includes(blockedTerm) ||
+          (article.keywords || []).some((kw: string) => kw.toLowerCase().includes(blockedTerm))
+        );
+        
+        return !hasBlockedKeyword;
+      });
+
+      console.log(`Filtered endpoint: ${curatedArticles.length} curated articles -> ${filtered.length} after filtering (user ${userId || 'anonymous'})`);
+      
+      res.json(filtered);
+    } catch (error) {
+      console.error("Failed to fetch filtered articles:", error);
+      res.status(500).json({ message: "Failed to fetch filtered articles" });
+    }
+  });
+
   app.get("/api/articles/top-five", async (req: any, res) => {
     try {
       const articles = await storage.getTopFiveArticles();
