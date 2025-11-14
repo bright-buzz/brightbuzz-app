@@ -1,12 +1,73 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
-import { ListOrdered, Clock, Eye, Heart } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { ListOrdered, Clock, Eye, Heart, Bookmark, BookmarkCheck } from "lucide-react";
 import type { Article } from "@shared/schema";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
 
 export function TopFivePreviewSection() {
+  const { toast } = useToast();
+  const { isAuthenticated } = useAuth();
+  
   const { data: articles = [], isLoading } = useQuery<Article[]>({
     queryKey: ['/api/articles/top-five'],
   });
+
+  const { data: savedArticlesData = [] } = useQuery<Article[]>({
+    queryKey: ['/api/saved-articles'],
+    enabled: isAuthenticated,
+  });
+
+  const savedArticleIds = new Set(savedArticlesData.map(a => a.id));
+
+  const saveMutation = useMutation({
+    mutationFn: (articleId: string) => 
+      apiRequest('POST', `/api/articles/${articleId}/save`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/saved-articles'] });
+      toast({
+        title: "Article saved",
+        description: "Article added to your saved list.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to save article. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const unsaveMutation = useMutation({
+    mutationFn: (articleId: string) => 
+      apiRequest('POST', `/api/articles/${articleId}/unsave`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/saved-articles'] });
+      toast({
+        title: "Article removed",
+        description: "Article removed from your saved list.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to remove article. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleSave = (e: React.MouseEvent, articleId: string) => {
+    e.stopPropagation();
+    if (savedArticleIds.has(articleId)) {
+      unsaveMutation.mutate(articleId);
+    } else {
+      saveMutation.mutate(articleId);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -89,6 +150,19 @@ export function TopFivePreviewSection() {
                         <Heart className="h-3 w-3 text-red-500" />
                         <span>{Math.round(article.sentiment * 100)}% positive</span>
                       </span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 px-2 hover:bg-slate-100"
+                        onClick={(e) => handleSave(e, article.id)}
+                        data-testid={`button-save-top-${index + 1}`}
+                      >
+                        {savedArticleIds.has(article.id) ? (
+                          <BookmarkCheck className="h-3 w-3 fill-primary text-primary" />
+                        ) : (
+                          <Bookmark className="h-3 w-3" />
+                        )}
+                      </Button>
                     </div>
                   </div>
                   {article.imageUrl && (

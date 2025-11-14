@@ -7,6 +7,7 @@ import { useAuth } from "@/hooks/useAuth";
 import Home from "@/pages/home";
 import Landing from "@/pages/landing";
 import Settings from "@/pages/settings";
+import Saved from "@/pages/saved";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -20,6 +21,7 @@ function Router() {
         <>
           <Route path="/" component={Home} />
           <Route path="/settings" component={Settings} />
+          <Route path="/saved" component={Saved} />
         </>
       )}
       <Route component={NotFound} />

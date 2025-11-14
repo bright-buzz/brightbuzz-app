@@ -1,4 +1,4 @@
-import { Newspaper, Shield, Settings, LogOut, User as UserIcon } from "lucide-react";
+import { Newspaper, Shield, Settings, LogOut, User as UserIcon, Bookmark } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
@@ -41,6 +41,16 @@ export function AppHeader({ filteredCount }: AppHeaderProps) {
                 {filteredCount} articles filtered today
               </span>
             </div>
+            
+            <Link href="/saved">
+              <Button 
+                variant="outline"
+                data-testid="button-saved"
+              >
+                <Bookmark className="text-sm mr-2" />
+                <span className="hidden sm:block">Saved</span>
+              </Button>
+            </Link>
             
             <Link href="/settings">
               <Button 

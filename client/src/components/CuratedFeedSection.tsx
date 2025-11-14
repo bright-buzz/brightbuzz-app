@@ -1,19 +1,78 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Star, Crown, Heart, Bookmark, Eye } from "lucide-react";
+import { Star, Crown, Heart, Bookmark, BookmarkCheck, Eye } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import type { Article } from "@shared/schema";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
 
 export function CuratedFeedSection() {
   const [visibleCount, setVisibleCount] = useState(5);
   const MAX_ARTICLES = 30;
   const persistedVisibleCount = useRef(5); // Persist across re-renders
+  const { toast } = useToast();
+  const { isAuthenticated } = useAuth();
   
   const { data: articles = [], isLoading } = useQuery<Article[]>({
     queryKey: ['/api/articles/curated'],
   });
+
+  const { data: savedArticlesData = [] } = useQuery<Article[]>({
+    queryKey: ['/api/saved-articles'],
+    enabled: isAuthenticated,
+  });
+
+  const savedArticleIds = new Set(savedArticlesData.map(a => a.id));
+
+  const saveMutation = useMutation({
+    mutationFn: (articleId: string) => 
+      apiRequest('POST', `/api/articles/${articleId}/save`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/saved-articles'] });
+      toast({
+        title: "Article saved",
+        description: "Article added to your saved list.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to save article. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const unsaveMutation = useMutation({
+    mutationFn: (articleId: string) => 
+      apiRequest('POST', `/api/articles/${articleId}/unsave`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/saved-articles'] });
+      toast({
+        title: "Article removed",
+        description: "Article removed from your saved list.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to remove article. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleSave = (e: React.MouseEvent, articleId: string) => {
+    e.stopPropagation();
+    if (savedArticleIds.has(articleId)) {
+      unsaveMutation.mutate(articleId);
+    } else {
+      saveMutation.mutate(articleId);
+    }
+  };
 
   // Restore persisted visible count when articles data changes (use articles as dependency to trigger on refetch)
   useEffect(() => {
@@ -118,9 +177,19 @@ export function CuratedFeedSection() {
                   size="sm"
                   className="flex items-center space-x-1 hover:text-primary transition-colors"
                   data-testid={`button-bookmark-${featuredArticle.id}`}
+                  onClick={(e) => handleSave(e, featuredArticle.id)}
                 >
-                  <Bookmark className="h-3 w-3" />
-                  <span>Save</span>
+                  {savedArticleIds.has(featuredArticle.id) ? (
+                    <>
+                      <BookmarkCheck className="h-3 w-3 fill-primary text-primary" />
+                      <span>Saved</span>
+                    </>
+                  ) : (
+                    <>
+                      <Bookmark className="h-3 w-3" />
+                      <span>Save</span>
+                    </>
+                  )}
                 </Button>
               </div>
             </article>
@@ -152,10 +221,25 @@ export function CuratedFeedSection() {
                   </p>
                   <div className="flex items-center justify-between text-xs text-slate-500">
                     <span>{article.source}</span>
-                    <span className="flex items-center space-x-1">
-                      <Heart className="h-3 w-3 text-red-500" />
-                      <span>{Math.round(article.sentiment * 100)}%</span>
-                    </span>
+                    <div className="flex items-center space-x-2">
+                      <span className="flex items-center space-x-1">
+                        <Heart className="h-3 w-3 text-red-500" />
+                        <span>{Math.round(article.sentiment * 100)}%</span>
+                      </span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 px-2 hover:bg-slate-100"
+                        onClick={(e) => handleSave(e, article.id)}
+                        data-testid={`button-save-${article.id}`}
+                      >
+                        {savedArticleIds.has(article.id) ? (
+                          <BookmarkCheck className="h-3 w-3 fill-primary text-primary" />
+                        ) : (
+                          <Bookmark className="h-3 w-3" />
+                        )}
+                      </Button>
+                    </div>
                   </div>
                 </div>
               </div>
