@@ -72,6 +72,13 @@ export const userArticleLikes = pgTable("user_article_likes", {
   likedAt: timestamp("liked_at").defaultNow(),
 });
 
+export const userSavedArticles = pgTable("user_saved_articles", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  articleId: varchar("article_id").notNull().references(() => articles.id),
+  savedAt: timestamp("saved_at").defaultNow(),
+});
+
 export const insertArticleSchema = createInsertSchema(articles).omit({
   id: true,
   views: true,
@@ -146,3 +153,11 @@ export const insertUserArticleLikeSchema = createInsertSchema(userArticleLikes).
 
 export type UserArticleLike = typeof userArticleLikes.$inferSelect;
 export type InsertUserArticleLike = z.infer<typeof insertUserArticleLikeSchema>;
+
+export const insertUserSavedArticleSchema = createInsertSchema(userSavedArticles).omit({
+  id: true,
+  savedAt: true,
+});
+
+export type UserSavedArticle = typeof userSavedArticles.$inferSelect;
+export type InsertUserSavedArticle = z.infer<typeof insertUserSavedArticleSchema>;
