@@ -8,6 +8,7 @@ import { useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { Article } from "@shared/schema";
+import { FeedbackButtons } from "@/components/FeedbackButtons";
 
 export default function Saved() {
   const { toast } = useToast();
@@ -117,6 +118,8 @@ export default function Saved() {
                     </div>
 
                     <div className="flex flex-col gap-2">
+                      <FeedbackButtons articleId={article.id} size="md" />
+                      
                       <Button
                         variant="ghost"
                         size="sm"

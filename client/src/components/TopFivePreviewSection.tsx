@@ -7,6 +7,7 @@ import type { Article } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
+import { FeedbackButtons } from "@/components/FeedbackButtons";
 
 export function TopFivePreviewSection() {
   const { toast } = useToast();
@@ -143,19 +144,22 @@ export function TopFivePreviewSection() {
                     <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500">
                       <span>{article.source}</span>
                       <span>{article.readTime} min read</span>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-6 px-2 hover:bg-slate-100"
-                        onClick={(e) => handleSave(e, article.id)}
-                        data-testid={`button-save-top-${index + 1}`}
-                      >
-                        {savedArticleIds.has(article.id) ? (
-                          <BookmarkCheck className="h-3 w-3 fill-primary text-primary" />
-                        ) : (
-                          <Bookmark className="h-3 w-3" />
-                        )}
-                      </Button>
+                      <div className="flex items-center gap-1">
+                        <FeedbackButtons articleId={article.id} size="sm" />
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 px-2 hover:bg-slate-100"
+                          onClick={(e) => handleSave(e, article.id)}
+                          data-testid={`button-save-top-${index + 1}`}
+                        >
+                          {savedArticleIds.has(article.id) ? (
+                            <BookmarkCheck className="h-3 w-3 fill-primary text-primary" />
+                          ) : (
+                            <Bookmark className="h-3 w-3" />
+                          )}
+                        </Button>
+                      </div>
                     </div>
                   </div>
                   {article.imageUrl && (

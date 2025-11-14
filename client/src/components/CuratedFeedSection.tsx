@@ -8,6 +8,7 @@ import type { Article } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
+import { FeedbackButtons } from "@/components/FeedbackButtons";
 
 export function CuratedFeedSection() {
   const [visibleCount, setVisibleCount] = useState(5);
@@ -168,25 +169,28 @@ export function CuratedFeedSection() {
                   <span>{featuredArticle.source}</span>
                   <span>{featuredArticle.readTime} min read</span>
                 </div>
-                <Button 
-                  variant="ghost" 
-                  size="sm"
-                  className="flex items-center space-x-1 hover:text-primary transition-colors"
-                  data-testid={`button-bookmark-${featuredArticle.id}`}
-                  onClick={(e) => handleSave(e, featuredArticle.id)}
-                >
-                  {savedArticleIds.has(featuredArticle.id) ? (
-                    <>
-                      <BookmarkCheck className="h-3 w-3 fill-primary text-primary" />
-                      <span>Saved</span>
-                    </>
-                  ) : (
-                    <>
-                      <Bookmark className="h-3 w-3" />
-                      <span>Save</span>
-                    </>
-                  )}
-                </Button>
+                <div className="flex items-center gap-2">
+                  <FeedbackButtons articleId={featuredArticle.id} size="sm" />
+                  <Button 
+                    variant="ghost" 
+                    size="sm"
+                    className="flex items-center space-x-1 hover:text-primary transition-colors"
+                    data-testid={`button-bookmark-${featuredArticle.id}`}
+                    onClick={(e) => handleSave(e, featuredArticle.id)}
+                  >
+                    {savedArticleIds.has(featuredArticle.id) ? (
+                      <>
+                        <BookmarkCheck className="h-3 w-3 fill-primary text-primary" />
+                        <span>Saved</span>
+                      </>
+                    ) : (
+                      <>
+                        <Bookmark className="h-3 w-3" />
+                        <span>Save</span>
+                      </>
+                    )}
+                  </Button>
+                </div>
               </div>
             </article>
           )}
@@ -217,19 +221,22 @@ export function CuratedFeedSection() {
                   </p>
                   <div className="flex items-center justify-between text-xs text-slate-500">
                     <span>{article.source}</span>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-6 px-2 hover:bg-slate-100"
-                      onClick={(e) => handleSave(e, article.id)}
-                      data-testid={`button-save-${article.id}`}
-                    >
-                      {savedArticleIds.has(article.id) ? (
-                        <BookmarkCheck className="h-3 w-3 fill-primary text-primary" />
-                      ) : (
-                        <Bookmark className="h-3 w-3" />
-                      )}
-                    </Button>
+                    <div className="flex items-center gap-1">
+                      <FeedbackButtons articleId={article.id} size="sm" />
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 px-2 hover:bg-slate-100"
+                        onClick={(e) => handleSave(e, article.id)}
+                        data-testid={`button-save-${article.id}`}
+                      >
+                        {savedArticleIds.has(article.id) ? (
+                          <BookmarkCheck className="h-3 w-3 fill-primary text-primary" />
+                        ) : (
+                          <Bookmark className="h-3 w-3" />
+                        )}
+                      </Button>
+                    </div>
                   </div>
                 </div>
               </div>
