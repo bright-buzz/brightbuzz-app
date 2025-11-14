@@ -332,7 +332,15 @@ export class NewsService {
     try {
       console.log(`Starting basic curation with ${articles.length} articles`);
       
-      // FIRST: Filter by date - only articles from last 30 days are eligible for curation
+      // STEP 1: Clear old curation flags to prevent stale data
+      console.log('Clearing old curation flags...');
+      for (const article of articles) {
+        if (article.isCurated || article.isTopFive) {
+          await storage.updateArticle(article.id, { isCurated: false, isTopFive: false });
+        }
+      }
+      
+      // STEP 2: Filter by date - only articles from last 30 days are eligible for curation
       const thirtyDaysAgo = Date.now() - (30 * 24 * 60 * 60 * 1000);
       const recentArticles = articles.filter((article: any) => {
         const publishedDate = new Date(article.publishedAt).getTime();
