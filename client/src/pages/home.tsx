@@ -31,7 +31,7 @@ export default function Home() {
       console.log('Refresh mutation succeeded, invalidating queries...');
       // Invalidate queries to trigger refetch
       queryClient.invalidateQueries({ queryKey: ['/api/articles'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/articles/curated'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/articles/filtered'] });
       queryClient.invalidateQueries({ queryKey: ['/api/articles/top-five'] });
       queryClient.invalidateQueries({ queryKey: ['/api/filter-preview'] });
       
@@ -59,7 +59,7 @@ export default function Home() {
         // Invalidate article queries to refetch with new data
         await Promise.all([
           queryClient.invalidateQueries({ queryKey: ['/api/articles'] }),
-          queryClient.invalidateQueries({ queryKey: ['/api/articles/curated'] }),
+          queryClient.invalidateQueries({ queryKey: ['/api/articles/filtered'] }),
           queryClient.invalidateQueries({ queryKey: ['/api/articles/top-five'] }),
           queryClient.invalidateQueries({ queryKey: ['/api/filter-preview'] })
         ]);
