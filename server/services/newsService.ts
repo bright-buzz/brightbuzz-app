@@ -332,13 +332,22 @@ export class NewsService {
     try {
       console.log(`Starting basic curation with ${articles.length} articles`);
       
+      // FIRST: Filter by date - only articles from last 30 days are eligible for curation
+      const thirtyDaysAgo = Date.now() - (30 * 24 * 60 * 60 * 1000);
+      const recentArticles = articles.filter((article: any) => {
+        const publishedDate = new Date(article.publishedAt).getTime();
+        return publishedDate >= thirtyDaysAgo;
+      });
+      
+      console.log(`After date filtering (last 30 days): ${recentArticles.length} of ${articles.length} articles remain`);
+      
       // Filter out negative keywords (global process - no user-specific replacements)
       const blockedKeywords = await storage.getKeywords();
       const blockedTerms = blockedKeywords
         .filter((k: any) => k.type === 'blocked')
         .map((k: any) => k.keyword.toLowerCase());
       
-      const filteredArticles = articles.filter((article: any) => {
+      const filteredArticles = recentArticles.filter((article: any) => {
         const articleText = `${article.title} ${article.summary}`.toLowerCase();
         return !blockedTerms.some((term: string) => articleText.includes(term));
       });
