@@ -22,7 +22,7 @@ import {
   type InsertPodcast,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, and, inArray } from "drizzle-orm";
+import { eq, desc, and, inArray, sql } from "drizzle-orm";
 import type { IStorage } from "./storage";
 
 export class DatabaseStorage implements IStorage {
@@ -83,6 +83,13 @@ export class DatabaseStorage implements IStorage {
       .where(eq(articles.id, id))
       .returning();
     return article;
+  }
+
+  async clearAllCurationFlags(): Promise<void> {
+    await db
+      .update(articles)
+      .set({ isCurated: false, isTopFive: false })
+      .where(sql`is_curated = true OR is_top_five = true`);
   }
 
   // Article Likes

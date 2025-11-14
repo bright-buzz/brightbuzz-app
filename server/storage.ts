@@ -12,6 +12,7 @@ export interface IStorage {
   getCuratedArticles(): Promise<Article[]>;
   getTopFiveArticles(): Promise<Article[]>;
   updateArticle(id: string, updates: Partial<Article>): Promise<Article | undefined>;
+  clearAllCurationFlags(): Promise<void>;
   
   // Article Likes
   likeArticle(articleId: string, userId: string): Promise<{ success: boolean; likes: number }>;
@@ -145,6 +146,14 @@ export class MemStorage implements IStorage {
     const updatedArticle = { ...article, ...updates };
     this.articles.set(id, updatedArticle);
     return updatedArticle;
+  }
+
+  async clearAllCurationFlags(): Promise<void> {
+    for (const [id, article] of this.articles.entries()) {
+      if (article.isCurated || article.isTopFive) {
+        this.articles.set(id, { ...article, isCurated: false, isTopFive: false });
+      }
+    }
   }
 
   async likeArticle(articleId: string, userId: string): Promise<{ success: boolean; likes: number }> {

@@ -332,13 +332,10 @@ export class NewsService {
     try {
       console.log(`Starting basic curation with ${articles.length} articles`);
       
-      // STEP 1: Clear old curation flags to prevent stale data
-      console.log('Clearing old curation flags...');
-      for (const article of articles) {
-        if (article.isCurated || article.isTopFive) {
-          await storage.updateArticle(article.id, { isCurated: false, isTopFive: false });
-        }
-      }
+      // STEP 1: Clear ALL old curation flags to prevent stale data (bulk update for efficiency)
+      console.log('Clearing all old curation flags...');
+      await storage.clearAllCurationFlags();
+      console.log('Curation flags cleared');
       
       // STEP 2: Filter by date - only articles from last 30 days are eligible for curation
       const thirtyDaysAgo = Date.now() - (30 * 24 * 60 * 60 * 1000);

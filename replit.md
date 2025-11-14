@@ -12,6 +12,13 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
+- **Curated Feed Date Filtering Fix (November 2025)**: Fixed issue where outdated articles were appearing in curated feed
+  - Added 30-day date cutoff to curation algorithm - only articles published within last 30 days are eligible for curation
+  - Added date filtering to `/api/articles/filtered` endpoint as additional safety layer
+  - Implemented `clearAllCurationFlags()` method to efficiently clear old curation flags before each run
+  - Old articles (like August 2025 content) are now properly excluded from curated feed
+  - Dual-layer filtering (curation + endpoint) ensures no outdated content surfaces to users
+
 - **Curated Feed Filtering Enhancement (November 2025)**: Implemented proper user preference filtering for curated feed
   - Created new `/api/articles/filtered` endpoint that applies sentiment threshold and blocked keywords to curated articles
   - Updated CuratedFeedSection to use filtered endpoint instead of raw curated articles
