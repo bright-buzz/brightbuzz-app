@@ -12,6 +12,14 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
+- **Curated Feed Filtering Enhancement (November 2025)**: Implemented proper user preference filtering for curated feed
+  - Created new `/api/articles/filtered` endpoint that applies sentiment threshold and blocked keywords to curated articles
+  - Updated CuratedFeedSection to use filtered endpoint instead of raw curated articles
+  - Implemented 20-article pagination with "Load More" button showing remaining article count
+  - Pagination automatically resets when user preferences change
+  - Manual refresh and automatic periodic fetching now invalidate filtered articles cache
+  - Successfully tested end-to-end with 219 articles properly filtered and paginated
+
 - **Multiple Login Options Clarification (October 2025)**: Enhanced landing page to clearly communicate authentication options
   - Updated landing page to explicitly show all available login methods: Gmail, Apple, GitHub, X (Twitter), and email/password
   - Added helpful text below sign-in buttons: "Sign in with Gmail, Apple, GitHub, X, or email"
