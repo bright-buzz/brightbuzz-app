@@ -6,6 +6,7 @@ import {
   userPreferences,
   podcasts,
   userArticleLikes,
+  userSavedArticles,
   type User,
   type UpsertUser,
   type Article,

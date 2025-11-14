@@ -2,6 +2,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ListOrdered, Clock, Eye, Heart, Bookmark, BookmarkCheck } from "lucide-react";
+import type { MouseEvent } from "react";
 import type { Article } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -60,7 +61,7 @@ export function TopFivePreviewSection() {
     },
   });
 
-  const handleSave = (e: React.MouseEvent, articleId: string) => {
+  const handleSave = (e: MouseEvent, articleId: string) => {
     e.stopPropagation();
     if (savedArticleIds.has(articleId)) {
       unsaveMutation.mutate(articleId);

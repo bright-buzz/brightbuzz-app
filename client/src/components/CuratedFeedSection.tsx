@@ -3,7 +3,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Star, Crown, Heart, Bookmark, BookmarkCheck, Eye } from "lucide-react";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, type MouseEvent } from "react";
 import type { Article } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -65,7 +65,7 @@ export function CuratedFeedSection() {
     },
   });
 
-  const handleSave = (e: React.MouseEvent, articleId: string) => {
+  const handleSave = (e: MouseEvent, articleId: string) => {
     e.stopPropagation();
     if (savedArticleIds.has(articleId)) {
       unsaveMutation.mutate(articleId);
