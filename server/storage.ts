@@ -25,6 +25,13 @@ export interface IStorage {
   isArticleSavedByUser(articleId: string, userId: string): Promise<boolean>;
   getSavedArticles(userId: string): Promise<Article[]>;
   
+  // Article Feedback
+  saveFeedback(userId: string, articleId: string, feedback: 'thumbs_up' | 'thumbs_down'): Promise<{ success: boolean }>;
+  removeFeedback(userId: string, articleId: string): Promise<{ success: boolean }>;
+  getFeedback(userId: string, articleId: string): Promise<{ feedback: 'thumbs_up' | 'thumbs_down' } | null>;
+  getUserFeedback(userId: string): Promise<Array<{ articleId: string; feedback: 'thumbs_up' | 'thumbs_down'; createdAt: Date }>>;
+  getFeedbackSummaryForArticles(articleIds: string[]): Promise<Map<string, { thumbsUp: number; thumbsDown: number }>>;
+  
   // Keywords
   createKeyword(keyword: InsertKeyword): Promise<Keyword>;
   getKeywords(): Promise<Keyword[]>;
@@ -57,6 +64,7 @@ export class MemStorage implements IStorage {
   private userPreferences: UserPreferences | undefined;
   private userLikes: Map<string, Set<string>>; // Map of userId -> Set of articleIds
   private userSavedArticles: Map<string, Set<string>>; // Map of userId -> Set of articleIds
+  private userFeedback: Map<string, Map<string, { feedback: 'thumbs_up' | 'thumbs_down'; createdAt: Date }>>; // Map of userId -> Map of articleId -> feedback
 
   constructor() {
     this.articles = new Map();
@@ -66,6 +74,7 @@ export class MemStorage implements IStorage {
     this.users = new Map();
     this.userLikes = new Map();
     this.userSavedArticles = new Map();
+    this.userFeedback = new Map();
     this.userPreferences = {
       id: randomUUID(),
       userId: null,
@@ -231,6 +240,71 @@ export class MemStorage implements IStorage {
     return savedArticles.sort((a, b) => 
       new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime()
     );
+  }
+
+  async saveFeedback(userId: string, articleId: string, feedback: 'thumbs_up' | 'thumbs_down'): Promise<{ success: boolean }> {
+    const article = this.articles.get(articleId);
+    if (!article) return { success: false };
+    
+    let userFeedbackMap = this.userFeedback.get(userId);
+    if (!userFeedbackMap) {
+      userFeedbackMap = new Map();
+      this.userFeedback.set(userId, userFeedbackMap);
+    }
+    
+    userFeedbackMap.set(articleId, { feedback, createdAt: new Date() });
+    return { success: true };
+  }
+
+  async removeFeedback(userId: string, articleId: string): Promise<{ success: boolean }> {
+    const userFeedbackMap = this.userFeedback.get(userId);
+    if (!userFeedbackMap) return { success: false };
+    
+    const deleted = userFeedbackMap.delete(articleId);
+    return { success: deleted };
+  }
+
+  async getFeedback(userId: string, articleId: string): Promise<{ feedback: 'thumbs_up' | 'thumbs_down' } | null> {
+    const userFeedbackMap = this.userFeedback.get(userId);
+    if (!userFeedbackMap) return null;
+    
+    const feedback = userFeedbackMap.get(articleId);
+    return feedback ? { feedback: feedback.feedback } : null;
+  }
+
+  async getUserFeedback(userId: string): Promise<Array<{ articleId: string; feedback: 'thumbs_up' | 'thumbs_down'; createdAt: Date }>> {
+    const userFeedbackMap = this.userFeedback.get(userId);
+    if (!userFeedbackMap) return [];
+    
+    const result: Array<{ articleId: string; feedback: 'thumbs_up' | 'thumbs_down'; createdAt: Date }> = [];
+    for (const [articleId, data] of userFeedbackMap.entries()) {
+      result.push({ articleId, feedback: data.feedback, createdAt: data.createdAt });
+    }
+    
+    return result.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+  }
+
+  async getFeedbackSummaryForArticles(articleIds: string[]): Promise<Map<string, { thumbsUp: number; thumbsDown: number }>> {
+    const summary = new Map<string, { thumbsUp: number; thumbsDown: number }>();
+    
+    for (const articleId of articleIds) {
+      summary.set(articleId, { thumbsUp: 0, thumbsDown: 0 });
+    }
+    
+    for (const userFeedbackMap of this.userFeedback.values()) {
+      for (const [articleId, data] of userFeedbackMap.entries()) {
+        if (articleIds.includes(articleId)) {
+          const stats = summary.get(articleId)!;
+          if (data.feedback === 'thumbs_up') {
+            stats.thumbsUp++;
+          } else {
+            stats.thumbsDown++;
+          }
+        }
+      }
+    }
+    
+    return summary;
   }
 
   async createKeyword(insertKeyword: InsertKeyword): Promise<Keyword> {
