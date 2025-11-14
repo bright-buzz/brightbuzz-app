@@ -192,6 +192,84 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Saved articles endpoints
+  app.post("/api/articles/:id/save", isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const userId = req.user.claims.sub;
+      const result = await storage.saveArticle(id, userId);
+      res.json(result);
+    } catch (error) {
+      console.error("Error saving article:", error);
+      res.status(500).json({ message: "Failed to save article" });
+    }
+  });
+
+  app.post("/api/articles/:id/unsave", isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const userId = req.user.claims.sub;
+      const result = await storage.unsaveArticle(id, userId);
+      res.json(result);
+    } catch (error) {
+      console.error("Error unsaving article:", error);
+      res.status(500).json({ message: "Failed to unsave article" });
+    }
+  });
+
+  app.get("/api/articles/:id/saved", isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const userId = req.user.claims.sub;
+      const isSaved = await storage.isArticleSavedByUser(id, userId);
+      res.json({ isSaved });
+    } catch (error) {
+      console.error("Error checking saved status:", error);
+      res.status(500).json({ message: "Failed to check saved status" });
+    }
+  });
+
+  app.get("/api/saved-articles", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const savedArticles = await storage.getSavedArticles(userId);
+      
+      // Apply replacement patterns if user is authenticated
+      let replacementPatterns: any[] = [];
+      try {
+        replacementPatterns = await storage.getReplacementPatterns(userId);
+      } catch (error) {
+        console.error('Failed to fetch replacement patterns:', error);
+      }
+
+      console.log(`Saved articles endpoint: Found ${replacementPatterns.length} replacement patterns for user ${userId}`);
+
+      const applyReplacementPatterns = (text: string): string => {
+        let transformedText = text;
+        
+        for (const pattern of replacementPatterns) {
+          const escapedFind = pattern.findText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          const flags = pattern.caseSensitive ? 'g' : 'gi';
+          const regex = new RegExp(escapedFind, flags);
+          transformedText = transformedText.replace(regex, pattern.replaceText);
+        }
+        
+        return transformedText;
+      };
+
+      const transformedArticles = savedArticles.map((article) => ({
+        ...article,
+        title: applyReplacementPatterns(article.title),
+        summary: applyReplacementPatterns(article.summary)
+      }));
+      
+      res.json(transformedArticles);
+    } catch (error) {
+      console.error("Error fetching saved articles:", error);
+      res.status(500).json({ message: "Failed to fetch saved articles" });
+    }
+  });
+
   // Keywords endpoints
   app.get("/api/keywords", async (req, res) => {
     try {
