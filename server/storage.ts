@@ -19,6 +19,12 @@ export interface IStorage {
   isArticleLikedByUser(articleId: string, userId: string): Promise<boolean>;
   getUserLikedArticles(userId: string): Promise<string[]>;
   
+  // Saved Articles
+  saveArticle(articleId: string, userId: string): Promise<{ success: boolean }>;
+  unsaveArticle(articleId: string, userId: string): Promise<{ success: boolean }>;
+  isArticleSavedByUser(articleId: string, userId: string): Promise<boolean>;
+  getSavedArticles(userId: string): Promise<Article[]>;
+  
   // Keywords
   createKeyword(keyword: InsertKeyword): Promise<Keyword>;
   getKeywords(): Promise<Keyword[]>;
@@ -50,6 +56,7 @@ export class MemStorage implements IStorage {
   private users: Map<string, User>;
   private userPreferences: UserPreferences | undefined;
   private userLikes: Map<string, Set<string>>; // Map of userId -> Set of articleIds
+  private userSavedArticles: Map<string, Set<string>>; // Map of userId -> Set of articleIds
 
   constructor() {
     this.articles = new Map();
@@ -58,6 +65,7 @@ export class MemStorage implements IStorage {
     this.podcasts = new Map();
     this.users = new Map();
     this.userLikes = new Map();
+    this.userSavedArticles = new Map();
     this.userPreferences = {
       id: randomUUID(),
       userId: null,
@@ -173,6 +181,56 @@ export class MemStorage implements IStorage {
   async getUserLikedArticles(userId: string): Promise<string[]> {
     const userLikeSet = this.userLikes.get(userId);
     return userLikeSet ? Array.from(userLikeSet) : [];
+  }
+
+  async saveArticle(articleId: string, userId: string): Promise<{ success: boolean }> {
+    const article = this.articles.get(articleId);
+    if (!article) return { success: false };
+    
+    let userSavedSet = this.userSavedArticles.get(userId);
+    if (!userSavedSet) {
+      userSavedSet = new Set<string>();
+      this.userSavedArticles.set(userId, userSavedSet);
+    }
+    
+    if (userSavedSet.has(articleId)) {
+      return { success: false };
+    }
+    
+    userSavedSet.add(articleId);
+    return { success: true };
+  }
+
+  async unsaveArticle(articleId: string, userId: string): Promise<{ success: boolean }> {
+    const userSavedSet = this.userSavedArticles.get(userId);
+    if (!userSavedSet || !userSavedSet.has(articleId)) {
+      return { success: false };
+    }
+    
+    userSavedSet.delete(articleId);
+    return { success: true };
+  }
+
+  async isArticleSavedByUser(articleId: string, userId: string): Promise<boolean> {
+    const userSavedSet = this.userSavedArticles.get(userId);
+    return userSavedSet ? userSavedSet.has(articleId) : false;
+  }
+
+  async getSavedArticles(userId: string): Promise<Article[]> {
+    const userSavedSet = this.userSavedArticles.get(userId);
+    if (!userSavedSet) return [];
+    
+    const savedArticles: Article[] = [];
+    for (const articleId of userSavedSet) {
+      const article = this.articles.get(articleId);
+      if (article) {
+        savedArticles.push(article);
+      }
+    }
+    
+    return savedArticles.sort((a, b) => 
+      new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime()
+    );
   }
 
   async createKeyword(insertKeyword: InsertKeyword): Promise<Keyword> {

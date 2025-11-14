@@ -151,6 +151,79 @@ export class DatabaseStorage implements IStorage {
     return likes.map(like => like.articleId);
   }
 
+  // Saved Articles
+  async saveArticle(articleId: string, userId: string): Promise<{ success: boolean }> {
+    const existingSave = await db
+      .select()
+      .from(userSavedArticles)
+      .where(and(eq(userSavedArticles.userId, userId), eq(userSavedArticles.articleId, articleId)))
+      .limit(1);
+    
+    if (existingSave.length > 0) {
+      return { success: false };
+    }
+    
+    await db.insert(userSavedArticles).values({ userId, articleId });
+    return { success: true };
+  }
+
+  async unsaveArticle(articleId: string, userId: string): Promise<{ success: boolean }> {
+    const existingSave = await db
+      .select()
+      .from(userSavedArticles)
+      .where(and(eq(userSavedArticles.userId, userId), eq(userSavedArticles.articleId, articleId)))
+      .limit(1);
+    
+    if (existingSave.length === 0) {
+      return { success: false };
+    }
+    
+    await db.delete(userSavedArticles).where(
+      and(eq(userSavedArticles.userId, userId), eq(userSavedArticles.articleId, articleId))
+    );
+    
+    return { success: true };
+  }
+
+  async isArticleSavedByUser(articleId: string, userId: string): Promise<boolean> {
+    const existingSave = await db
+      .select()
+      .from(userSavedArticles)
+      .where(and(eq(userSavedArticles.userId, userId), eq(userSavedArticles.articleId, articleId)))
+      .limit(1);
+    
+    return existingSave.length > 0;
+  }
+
+  async getSavedArticles(userId: string): Promise<Article[]> {
+    const savedArticleIds = await db
+      .select({ articleId: userSavedArticles.articleId })
+      .from(userSavedArticles)
+      .where(eq(userSavedArticles.userId, userId))
+      .orderBy(desc(userSavedArticles.savedAt));
+    
+    if (savedArticleIds.length === 0) {
+      return [];
+    }
+    
+    const articleIdList = savedArticleIds.map(s => s.articleId);
+    const savedArticles: Article[] = [];
+    
+    for (const articleId of articleIdList) {
+      const [article] = await db
+        .select()
+        .from(articles)
+        .where(eq(articles.id, articleId))
+        .limit(1);
+      
+      if (article) {
+        savedArticles.push(article);
+      }
+    }
+    
+    return savedArticles;
+  }
+
   // Keywords
   async createKeyword(insertKeyword: InsertKeyword): Promise<Keyword> {
     const [keyword] = await db
