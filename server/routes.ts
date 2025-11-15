@@ -6,6 +6,7 @@ import { podcastService } from "./services/podcastService";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 import { insertKeywordSchema, insertReplacementPatternSchema } from "@shared/schema";
 import type { FilterPreview } from "@shared/schema";
+import { applyFilters, applyReplacementsOnly } from "./services/filteringService";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware
@@ -34,49 +35,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/articles/curated", async (req: any, res) => {
     try {
+      const userId = req.isAuthenticated() ? req.user.claims.sub : undefined;
       const articles = await storage.getCuratedArticles();
       
-      // Apply replacement patterns if user is authenticated
-      if (req.isAuthenticated()) {
-        const userId = req.user.claims.sub;
-        let replacementPatterns: any[] = [];
-        try {
-          replacementPatterns = await storage.getReplacementPatterns(userId);
-        } catch (error) {
-          console.error('Failed to fetch replacement patterns:', error);
-        }
-
-        console.log(`Curated endpoint: Found ${replacementPatterns.length} replacement patterns for user ${userId}`);
-
-        const applyReplacementPatterns = (text: string): string => {
-          let transformedText = text;
-          
-          for (const pattern of replacementPatterns) {
-            // Escape user input for literal replacement to prevent ReDoS
-            const escapedFind = pattern.findText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-            // Respect caseSensitive flag
-            const flags = pattern.caseSensitive ? 'g' : 'gi';
-            const regex = new RegExp(escapedFind, flags);
-            const beforeText = transformedText;
-            transformedText = transformedText.replace(regex, pattern.replaceText);
-            if (beforeText !== transformedText) {
-              console.log(`Curated: Replacement applied \"${pattern.findText}\" -> \"${pattern.replaceText}\" in: \"${beforeText.substring(0, 100)}...\"`); 
-            }
-          }
-          
-          return transformedText;
-        };
-
-        const transformedArticles = articles.map((article) => ({
-          ...article,
-          title: applyReplacementPatterns(article.title),
-          summary: applyReplacementPatterns(article.summary)
-        }));
-        
-        res.json(transformedArticles);
-      } else {
-        res.json(articles);
-      }
+      // Only apply replacements (no filtering) for curated endpoint to preserve curation
+      const transformed = await applyReplacementsOnly(articles, userId);
+      
+      res.json(transformed);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch curated articles" });
     }
@@ -85,66 +50,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/articles/filtered", async (req: any, res) => {
     try {
       const userId = req.isAuthenticated() ? req.user.claims.sub : undefined;
-      const preferences = await storage.getUserPreferences(userId);
       const curatedArticles = await storage.getCuratedArticles();
       
-      // Apply replacement patterns if user is authenticated
-      let replacementPatterns: any[] = [];
-      if (userId) {
-        try {
-          replacementPatterns = await storage.getReplacementPatterns(userId);
-        } catch (error) {
-          console.error('Failed to fetch replacement patterns:', error);
-        }
-      }
-
-      const applyReplacementPatterns = (text: string): string => {
-        let transformedText = text;
-        
-        for (const pattern of replacementPatterns) {
-          const escapedFind = pattern.findText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-          const flags = pattern.caseSensitive ? 'g' : 'gi';
-          const regex = new RegExp(escapedFind, flags);
-          transformedText = transformedText.replace(regex, pattern.replaceText);
-        }
-        
-        return transformedText;
-      };
-
-      const transformedArticles = curatedArticles.map((article) => ({
-        ...article,
-        title: applyReplacementPatterns(article.title),
-        summary: applyReplacementPatterns(article.summary)
-      }));
-
-      // Apply user filtering preferences
-      const blockedKeywords = await storage.getKeywordsByType('blocked');
-      const blocked = blockedKeywords.map(kw => kw.keyword.toLowerCase());
-      
-      // Date threshold: only show articles from last 30 days
-      const thirtyDaysAgo = Date.now() - (30 * 24 * 60 * 60 * 1000);
-      
-      const filtered = transformedArticles.filter(article => {
-        // Check date freshness (must be within last 30 days)
-        const publishedDate = new Date(article.publishedAt).getTime();
-        if (publishedDate < thirtyDaysAgo) {
-          return false;
-        }
-        
-        // Check sentiment threshold
-        if (article.sentiment < (preferences?.sentimentThreshold || 0.7)) {
-          return false;
-        }
-        
-        // Check blocked keywords
-        const articleText = `${article.title} ${article.summary}`.toLowerCase();
-        const hasBlockedKeyword = blocked.some(blockedTerm => 
-          articleText.includes(blockedTerm) ||
-          (article.keywords || []).some((kw: string) => kw.toLowerCase().includes(blockedTerm))
-        );
-        
-        return !hasBlockedKeyword;
-      });
+      // Apply centralized filtering pipeline
+      const filtered = await applyFilters(curatedArticles, userId);
 
       console.log(`Filtered endpoint: ${curatedArticles.length} curated articles -> ${filtered.length} after filtering (user ${userId || 'anonymous'})`);
       
@@ -157,49 +66,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/articles/top-five", async (req: any, res) => {
     try {
+      const userId = req.isAuthenticated() ? req.user.claims.sub : undefined;
       const articles = await storage.getTopFiveArticles();
       
-      // Apply replacement patterns if user is authenticated
-      if (req.isAuthenticated()) {
-        const userId = req.user.claims.sub;
-        let replacementPatterns: any[] = [];
-        try {
-          replacementPatterns = await storage.getReplacementPatterns(userId);
-        } catch (error) {
-          console.error('Failed to fetch replacement patterns:', error);
-        }
+      // Apply centralized filtering pipeline (includes replacements and all filters)
+      const filtered = await applyFilters(articles, userId);
 
-        console.log(`Top-five endpoint: Found ${replacementPatterns.length} replacement patterns for user ${userId}`);
-
-        const applyReplacementPatterns = (text: string): string => {
-          let transformedText = text;
-          
-          for (const pattern of replacementPatterns) {
-            // Escape user input for literal replacement to prevent ReDoS
-            const escapedFind = pattern.findText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-            // Respect caseSensitive flag
-            const flags = pattern.caseSensitive ? 'g' : 'gi';
-            const regex = new RegExp(escapedFind, flags);
-            const beforeText = transformedText;
-            transformedText = transformedText.replace(regex, pattern.replaceText);
-            if (beforeText !== transformedText) {
-              console.log(`Top-five: Replacement applied \"${pattern.findText}\" -> \"${pattern.replaceText}\" in: \"${beforeText.substring(0, 100)}...\"`); 
-            }
-          }
-          
-          return transformedText;
-        };
-
-        const transformedArticles = articles.map((article) => ({
-          ...article,
-          title: applyReplacementPatterns(article.title),
-          summary: applyReplacementPatterns(article.summary)
-        }));
-        
-        res.json(transformedArticles);
-      } else {
-        res.json(articles);
-      }
+      console.log(`Top-five endpoint: ${articles.length} articles -> ${filtered.length} after filtering (user ${userId || 'anonymous'})`);
+      
+      res.json(filtered);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch top five articles" });
     }
@@ -307,36 +182,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.user.claims.sub;
       const savedArticles = await storage.getSavedArticles(userId);
       
-      // Apply replacement patterns if user is authenticated
-      let replacementPatterns: any[] = [];
-      try {
-        replacementPatterns = await storage.getReplacementPatterns(userId);
-      } catch (error) {
-        console.error('Failed to fetch replacement patterns:', error);
-      }
-
-      console.log(`Saved articles endpoint: Found ${replacementPatterns.length} replacement patterns for user ${userId}`);
-
-      const applyReplacementPatterns = (text: string): string => {
-        let transformedText = text;
-        
-        for (const pattern of replacementPatterns) {
-          const escapedFind = pattern.findText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-          const flags = pattern.caseSensitive ? 'g' : 'gi';
-          const regex = new RegExp(escapedFind, flags);
-          transformedText = transformedText.replace(regex, pattern.replaceText);
-        }
-        
-        return transformedText;
-      };
-
-      const transformedArticles = savedArticles.map((article) => ({
-        ...article,
-        title: applyReplacementPatterns(article.title),
-        summary: applyReplacementPatterns(article.summary)
-      }));
+      // Apply centralized filtering pipeline
+      const filtered = await applyFilters(savedArticles, userId);
       
-      res.json(transformedArticles);
+      console.log(`Saved articles endpoint: ${savedArticles.length} articles -> ${filtered.length} after filtering (user ${userId})`);
+      
+      res.json(filtered);
     } catch (error) {
       console.error("Error fetching saved articles:", error);
       res.status(500).json({ message: "Failed to fetch saved articles" });
