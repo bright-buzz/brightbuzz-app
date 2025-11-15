@@ -12,6 +12,18 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
+- **Centralized Filtering System (November 2025)**: Implemented unified filtering pipeline for consistent filter application across all features
+  - Created centralized `server/services/filteringService.ts` module with single `applyFilters()` function
+  - Filter pipeline order: Date freshness (30 days) → Blocked keywords → Prioritized keywords (boost/score) → Word replacements → Sentiment threshold
+  - Updated all article endpoints to use centralized filtering: `/api/articles/filtered`, `/api/articles/top-five`, `/api/articles/curated`, `/api/saved-articles`
+  - Updated podcast service to apply filters during daily podcast generation (ensures podcast only includes user-filtered articles)
+  - Fixed Settings page mutations to invalidate specific query keys (`/api/keywords/blocked`, `/api/keywords/prioritized`) and all article caches for immediate UI updates
+  - Filters now apply consistently across Top Articles, Curated Feed, Saved Articles, and Daily Podcast
+  - Prioritized keywords boost article priority scores rather than just filtering
+  - Word replacements apply to article titles and summaries with case-sensitive option
+  - Comprehensive end-to-end testing verified filters work correctly across all features
+  - Architecture: Stateless module with pure functions for better testability and maintainability
+
 - **Curated Feed Date Filtering Fix (November 2025)**: Fixed issue where outdated articles were appearing in curated feed
   - Added 30-day date cutoff to curation algorithm - only articles published within last 30 days are eligible for curation
   - Added date filtering to `/api/articles/filtered` endpoint as additional safety layer
