@@ -12,6 +12,17 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
+- **Deduplication Architecture Optimization (November 2025)**: Fixed feed count issue by moving deduplication to run before curation
+  - **Problem**: Top Five showing only 1 article, Curated Feed showing only 2 articles (should be 5 and 15-20 respectively)
+  - **Root Cause**: Deduplication was running AFTER curation had sliced articles into small sets, causing aggressive similarity matching to collapse distinct articles
+  - **Solution**: Moved deduplication to run ONCE on full article pool (2500+ articles) BEFORE curation algorithm in `server/services/newsService.ts`
+  - Modified `applyFilters()` in filteringService.ts to skip deduplication by default (via `skipDeduplication` parameter) at endpoint layer
+  - Added database unique constraint on `articles.url` column to prevent duplicate storage at database level
+  - Cleaned up 178 existing duplicate articles using quality ranking (highest sentiment > longest summary > most recent)
+  - **New Flow**: Date filter (30 days) → Blocked keywords → Deduplication → Scoring → Mark top 5 as isTopFive → Mark next 15 as isCurated
+  - Verified working: Top Five shows 5 articles, Curated Feed shows 15 articles with correct pagination
+  - Deduplication criteria: exact URL match > exact title match (case-insensitive) > content similarity (>80% word overlap in summary)
+
 - **Centralized Filtering System (November 2025)**: Implemented unified filtering pipeline for consistent filter application across all features
   - Created centralized `server/services/filteringService.ts` module with single `applyFilters()` function
   - Filter pipeline order: Date freshness (30 days) → Blocked keywords → Prioritized keywords (boost/score) → Word replacements → Sentiment threshold
