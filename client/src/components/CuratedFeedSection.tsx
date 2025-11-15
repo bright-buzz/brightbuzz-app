@@ -150,13 +150,6 @@ export function CuratedFeedSection() {
                     data-testid="img-featured-article" 
                   />
                 )}
-                <div className="absolute top-3 left-3 bg-secondary text-white text-xs px-2 py-1 rounded-full font-medium">
-                  <Crown className="inline mr-1 h-3 w-3" />
-                  Editor's Pick
-                </div>
-                <div className="absolute bottom-3 left-3 bg-black/70 text-white text-xs px-2 py-1 rounded-full">
-                  {featuredArticle.category}
-                </div>
               </div>
               <h3 className="text-xl font-bold text-slate-900 group-hover:text-primary transition-colors mb-2">
                 {featuredArticle.title}
