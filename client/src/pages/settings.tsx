@@ -44,8 +44,14 @@ export default function Settings() {
     mutationFn: (data: { keyword: string; type: string }) =>
       apiRequest('POST', '/api/keywords', data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/keywords'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/keywords/blocked'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/keywords/prioritized'] });
       queryClient.invalidateQueries({ queryKey: ['/api/filter-preview'] });
+      // Invalidate all article queries so UI reflects filter changes immediately
+      queryClient.invalidateQueries({ queryKey: ['/api/articles/filtered'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/articles/top-five'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/articles/curated'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/saved-articles'] });
       toast({ title: "Keyword added successfully" });
     },
   });
@@ -53,8 +59,14 @@ export default function Settings() {
   const deleteKeywordMutation = useMutation({
     mutationFn: (id: string) => apiRequest('DELETE', `/api/keywords/${id}`),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/keywords'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/keywords/blocked'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/keywords/prioritized'] });
       queryClient.invalidateQueries({ queryKey: ['/api/filter-preview'] });
+      // Invalidate all article queries so UI reflects filter changes immediately
+      queryClient.invalidateQueries({ queryKey: ['/api/articles/filtered'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/articles/top-five'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/articles/curated'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/saved-articles'] });
       toast({ title: "Keyword removed successfully" });
     },
   });
@@ -65,6 +77,11 @@ export default function Settings() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/replacement-patterns'] });
       queryClient.invalidateQueries({ queryKey: ['/api/filter-preview'] });
+      // Invalidate all article queries so UI reflects filter changes immediately
+      queryClient.invalidateQueries({ queryKey: ['/api/articles/filtered'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/articles/top-five'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/articles/curated'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/saved-articles'] });
       toast({ title: "Replacement pattern added successfully" });
     },
   });
@@ -75,6 +92,11 @@ export default function Settings() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/replacement-patterns'] });
       queryClient.invalidateQueries({ queryKey: ['/api/filter-preview'] });
+      // Invalidate all article queries so UI reflects filter changes immediately
+      queryClient.invalidateQueries({ queryKey: ['/api/articles/filtered'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/articles/top-five'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/articles/curated'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/saved-articles'] });
       toast({ title: "Replacement pattern deleted successfully" });
     },
   });
@@ -85,6 +107,11 @@ export default function Settings() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/preferences'] });
       queryClient.invalidateQueries({ queryKey: ['/api/filter-preview'] });
+      // Invalidate all article queries so UI reflects filter changes immediately
+      queryClient.invalidateQueries({ queryKey: ['/api/articles/filtered'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/articles/top-five'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/articles/curated'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/saved-articles'] });
     },
   });
 

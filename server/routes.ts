@@ -38,10 +38,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.isAuthenticated() ? req.user.claims.sub : undefined;
       const articles = await storage.getCuratedArticles();
       
-      // Only apply replacements (no filtering) for curated endpoint to preserve curation
-      const transformed = await applyReplacementsOnly(articles, userId);
+      // Apply centralized filtering pipeline (date, blocked keywords, prioritized keywords, replacements, sentiment)
+      const filtered = await applyFilters(articles, userId);
       
-      res.json(transformed);
+      console.log(`Curated endpoint: ${articles.length} curated articles -> ${filtered.length} after filtering (user ${userId || 'anonymous'})`);
+      
+      res.json(filtered);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch curated articles" });
     }
