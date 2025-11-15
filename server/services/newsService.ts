@@ -2,6 +2,7 @@ import { storage } from "../storage";
 import { analyzeSentiment, summarizeArticle, extractKeywords, curateArticles } from "./aiService";
 import { RSSService } from "./rssService";
 import type { InsertArticle } from "@shared/schema";
+import { deduplicateArticles } from "./filteringService";
 
 const NEWS_API_KEY = process.env.NEWS_API_KEY || process.env.VITE_NEWS_API_KEY || "default_key";
 
@@ -38,7 +39,10 @@ export class NewsService {
       console.log(`Retrieved ${rssArticles.length} articles from RSS feeds`);
 
       // Process RSS articles with fallback-only processing (skip AI due to quota)
-      const processedArticles = await this.processRSSArticlesWithFallback(rssArticles);
+      let processedArticles = await this.processRSSArticlesWithFallback(rssArticles);
+      
+      // Deduplicate articles before storing to prevent database duplicates
+      processedArticles = deduplicateArticles(processedArticles as any[]) as InsertArticle[];
       
       // Store articles
       for (const article of processedArticles) {

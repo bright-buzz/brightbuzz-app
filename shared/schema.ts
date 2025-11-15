@@ -9,7 +9,7 @@ export const articles = pgTable("articles", {
   summary: text("summary").notNull(),
   content: text("content"),
   source: text("source").notNull(),
-  url: text("url").notNull(),
+  url: text("url").notNull().unique(), // Unique constraint to prevent duplicate articles
   imageUrl: text("image_url"),
   category: text("category").notNull(),
   readTime: integer("read_time").notNull(), // in minutes
