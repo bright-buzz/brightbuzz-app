@@ -1,6 +1,7 @@
 import OpenAI from "openai";
 import { storage } from "../storage";
 import type { InsertPodcast, Article } from "@shared/schema";
+import { applyFilters } from "./filteringService";
 
 // the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
 const openai = new OpenAI({ 
@@ -8,21 +9,6 @@ const openai = new OpenAI({
 });
 
 export class PodcastService {
-  private applyReplacementPatterns(text: string, replacementPatterns: any[]): string {
-    let transformedText = text;
-    
-    for (const pattern of replacementPatterns) {
-      // Escape user input for literal replacement to prevent ReDoS
-      const escapedFind = pattern.findText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      // Respect caseSensitive flag
-      const flags = pattern.caseSensitive ? 'g' : 'gi';
-      const regex = new RegExp(escapedFind, flags);
-      transformedText = transformedText.replace(regex, pattern.replaceText);
-    }
-    
-    return transformedText;
-  }
-
   async generateDailyPodcast(userId?: string): Promise<string> {
     try {
       // Get curated articles and top 5 articles
@@ -33,48 +19,20 @@ export class PodcastService {
       const allArticles = [...curatedArticles, ...topFiveArticles];
       const uniqueArticles = Array.from(
         new Map(allArticles.map(article => [article.id, article])).values()
-      ).slice(0, 8); // Limit to 8 articles for 5-10 minute podcast
+      );
 
       if (uniqueArticles.length === 0) {
         throw new Error("No articles available for podcast generation");
       }
 
-      // Apply replacement patterns first - fetch once and reuse
-      let replacementPatterns: any[] = [];
-      try {
-        replacementPatterns = await storage.getReplacementPatterns(userId);
-      } catch (error) {
-        console.error('Failed to fetch replacement patterns:', error);
-      }
-
-      const transformedArticles = uniqueArticles.map((article) => ({
-        ...article,
-        title: this.applyReplacementPatterns(article.title, replacementPatterns),
-        summary: this.applyReplacementPatterns(article.summary, replacementPatterns)
-      }));
-
-      const preferences = await storage.getUserPreferences(userId);
-      const blockedKeywords = await storage.getKeywordsByType('blocked');
-      const blocked = blockedKeywords.map(kw => kw.keyword.toLowerCase());
+      // Apply centralized filtering pipeline
+      const filteredArticles = await applyFilters(uniqueArticles, userId);
       
-      const filteredArticles = transformedArticles.filter(article => {
-        // Check sentiment threshold
-        if (article.sentiment < (preferences?.sentimentThreshold || 0.7)) {
-          return false;
-        }
-        
-        // Check blocked keywords after applying replacements
-        const hasBlockedKeyword = blocked.some(blocked => 
-          article.title.toLowerCase().includes(blocked) ||
-          article.summary.toLowerCase().includes(blocked) ||
-          (article.keywords || []).some((kw: string) => kw.toLowerCase().includes(blocked))
-        );
-        
-        return !hasBlockedKeyword;
-      });
+      // Limit to 8 articles for 5-10 minute podcast (after filtering and sorting by priority)
+      const podcastArticles = filteredArticles.slice(0, 8);
 
       // Generate podcast script with fallback
-      const podcastScript = await this.generateScriptWithFallback(filteredArticles);
+      const podcastScript = await this.generateScriptWithFallback(podcastArticles);
       
       // Generate audio (simulated for now - would use OpenAI TTS or similar)
       const audioUrl = await this.generateAudio(podcastScript);
@@ -82,11 +40,11 @@ export class PodcastService {
       // Create podcast record
       const podcast: InsertPodcast = {
         title: `Daily News Digest - ${new Date().toLocaleDateString()}`,
-        description: `Your personalized 5-10 minute news podcast covering ${filteredArticles.length} curated stories from today's top news.`,
+        description: `Your personalized 5-10 minute news podcast covering ${podcastArticles.length} curated stories from today's top news.`,
         audioUrl,
         duration: this.estimateDuration(podcastScript),
         transcript: podcastScript,
-        articleIds: filteredArticles.map(a => a.id),
+        articleIds: podcastArticles.map(a => a.id),
         createdAt: new Date().toISOString(),
         isProcessing: false,
       };
