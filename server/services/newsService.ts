@@ -389,19 +389,21 @@ export class NewsService {
       // Sort by score (highest first)
       const sortedArticles = scoredArticles.sort((a, b) => b.score - a.score);
 
-      // Mark top 15 as curated
-      const curatedCount = Math.min(15, sortedArticles.length);
-      for (let i = 0; i < curatedCount; i++) {
-        await storage.updateArticle(sortedArticles[i].id, { isCurated: true });
-      }
-
-      // Mark top 5 as top five
+      // Mark top 5 as top five (exclusive - these will NOT be curated)
       const topFiveCount = Math.min(5, sortedArticles.length);
       for (let i = 0; i < topFiveCount; i++) {
-        await storage.updateArticle(sortedArticles[i].id, { isTopFive: true });
+        await storage.updateArticle(sortedArticles[i].id, { isTopFive: true, isCurated: false });
       }
 
-      console.log(`Basic curation complete: ${curatedCount} curated, ${topFiveCount} top five`);
+      // Mark next 15 articles (after top 5) as curated (exclusive - these will NOT be top five)
+      const curatedStart = topFiveCount;
+      const curatedEnd = Math.min(20, sortedArticles.length); // Top 5 + next 15 = 20 total
+      for (let i = curatedStart; i < curatedEnd; i++) {
+        await storage.updateArticle(sortedArticles[i].id, { isCurated: true, isTopFive: false });
+      }
+
+      const curatedCount = curatedEnd - curatedStart;
+      console.log(`Basic curation complete: ${topFiveCount} top five (exclusive), ${curatedCount} curated (exclusive), no overlap`);
       console.log(`Top article: "${sortedArticles[0]?.title}" (score: ${sortedArticles[0]?.score})`);
     } catch (error) {
       console.error("Failed to run basic curation:", error);

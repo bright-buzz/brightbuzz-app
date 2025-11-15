@@ -47,12 +47,46 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
+  // URL normalization helper
+  private normalizeUrl(url: string): string {
+    try {
+      const urlObj = new URL(url);
+      // Remove common tracking parameters
+      const trackingParams = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term', 'ref', 'fbclid', 'gclid'];
+      trackingParams.forEach(param => urlObj.searchParams.delete(param));
+      // Normalize: lowercase, remove trailing slash, sort params
+      urlObj.hostname = urlObj.hostname.toLowerCase();
+      urlObj.pathname = urlObj.pathname.replace(/\/$/, '');
+      urlObj.searchParams.sort();
+      return urlObj.toString();
+    } catch {
+      // If URL parsing fails, return lowercase version without trailing slash
+      return url.toLowerCase().replace(/\/$/, '');
+    }
+  }
+
   // Articles
   async createArticle(insertArticle: InsertArticle): Promise<Article> {
+    // Normalize URL to prevent duplicates with different tracking params
+    const normalizedUrl = this.normalizeUrl(insertArticle.url);
+    
+    // Use upsert to prevent duplicates - if URL exists, skip insert
     const [article] = await db
       .insert(articles)
-      .values(insertArticle)
+      .values({ ...insertArticle, url: normalizedUrl })
+      .onConflictDoNothing({ target: articles.url })
       .returning();
+    
+    // If article already exists (conflict), fetch it from DB
+    if (!article) {
+      const [existingArticle] = await db
+        .select()
+        .from(articles)
+        .where(eq(articles.url, normalizedUrl))
+        .limit(1);
+      return existingArticle;
+    }
+    
     return article;
   }
 

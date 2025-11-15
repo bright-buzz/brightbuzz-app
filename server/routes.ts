@@ -38,7 +38,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.isAuthenticated() ? req.user.claims.sub : undefined;
       const articles = await storage.getCuratedArticles();
       
-      // Apply centralized filtering pipeline (date, blocked keywords, prioritized keywords, replacements, sentiment)
+      // Apply centralized filtering pipeline (date, blocked keywords, prioritized keywords, replacements, sentiment, deduplication)
       const filtered = await applyFilters(articles, userId);
       
       console.log(`Curated endpoint: ${articles.length} curated articles -> ${filtered.length} after filtering (user ${userId || 'anonymous'})`);
