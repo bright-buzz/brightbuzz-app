@@ -214,26 +214,31 @@ export function computePriorityScore(article: Article, prioritizedKeywords: stri
 
 /**
  * Main filtering pipeline - applies all filters in the correct order:
- * 0. Deduplication (remove duplicate articles)
  * 1. Date Freshness Filter (exclude old articles)
  * 2. Blocked Keywords Filter (exclude)
  * 3. Prioritized Keywords Scoring (rank/boost)
  * 4. Word Replacements (transform text)
  * 5. Sentiment Filter (exclude low sentiment)
  * 
+ * Note: Deduplication is NOT applied here by default - it should be run ONCE
+ * on the full article pool before curation to avoid reducing already-sliced sets.
+ * 
  * @param articles - Array of articles to filter
  * @param userId - Optional user ID for personalized filtering
+ * @param skipDeduplication - Skip deduplication step (default: true)
  * @returns Filtered and transformed articles with priority scores
  */
 export async function applyFilters(
   articles: Article[],
-  userId?: string
+  userId?: string,
+  skipDeduplication: boolean = true
 ): Promise<FilteredArticle[]> {
   // Fetch all filter config in one operation
   const config = await fetchUserFilterConfig(userId);
   
-  // STEP 0: Deduplication - remove duplicate articles by URL, title, or content
-  let filtered = deduplicateArticles(articles);
+  // STEP 0 (Optional): Deduplication - remove duplicate articles by URL, title, or content
+  // By default, skip this step as deduplication happens once before curation
+  let filtered = skipDeduplication ? articles : deduplicateArticles(articles);
   
   // STEP 1: Date Freshness Filter - only articles within cutoff window
   const dateCutoff = Date.now() - (config.dateCutoffDays * 24 * 60 * 60 * 1000);

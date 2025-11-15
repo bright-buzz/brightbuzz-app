@@ -363,8 +363,14 @@ export class NewsService {
 
       console.log(`After keyword filtering: ${filteredArticles.length} articles remain`);
       
-      // Simple scoring based on positive criteria
-      const scoredArticles = filteredArticles.map((article: any) => {
+      // STEP 3: Deduplication - remove duplicate articles BEFORE scoring and selection
+      // This ensures we have enough unique articles to fill both Top Five (5) and Curated (15) sections
+      const { deduplicateArticles } = await import('./filteringService');
+      const deduplicatedArticles = deduplicateArticles(filteredArticles);
+      console.log(`After deduplication: ${deduplicatedArticles.length} unique articles (removed ${filteredArticles.length - deduplicatedArticles.length} duplicates)`);
+      
+      // STEP 4: Simple scoring based on positive criteria
+      const scoredArticles = deduplicatedArticles.map((article: any) => {
         let score = article.sentiment || 0.7; // Base sentiment score
         
         const titleAndSummary = `${article.title} ${article.summary}`.toLowerCase();
