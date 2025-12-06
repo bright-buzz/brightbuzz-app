@@ -138,7 +138,7 @@ export default function Landing() {
             <div className="flex flex-col items-center gap-3">
               <Button 
                 size="lg" 
-                onClick={() => window.location.href = '/api/login'}
+                onClick={() => window.location.href = '/login'}
                 className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 px-8 py-3 text-lg"
                 data-testid="button-cta-signup"
               >
