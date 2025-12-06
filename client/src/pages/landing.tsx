@@ -17,7 +17,7 @@ export default function Landing() {
               <h1 className="text-xl font-bold text-slate-900">BrightBuzz</h1>
             </div>
             <Button 
-              onClick={() => window.location.href = '/api/login'}
+            onClick={() => window.location.href = `${import.meta.env.VITE_API_URL}/api/login`}
               className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
               data-testid="button-login"
             >
