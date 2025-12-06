@@ -10,8 +10,9 @@ import { applyFilters, applyReplacementsOnly } from "./services/filteringService
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware
+if (process.env.NODE_ENV === "development") {
   await setupAuth(app);
-
+}
   // Auth routes
   app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
     try {
