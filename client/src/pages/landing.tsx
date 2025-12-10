@@ -2,6 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Shield, Zap, Headphones, TrendingUp, Star, Clock } from "lucide-react";
+import { SignInButton } from "@clerk/clerk-react";
 
 export default function Landing() {
   return (
@@ -16,13 +17,14 @@ export default function Landing() {
               </div>
               <h1 className="text-xl font-bold text-slate-900">BrightBuzz</h1>
             </div>
-            <Button 
-            onClick={() => window.location.href = `${import.meta.env.VITE_API_URL}/api/login`}
-              className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
-              data-testid="button-login"
-            >
-              Sign In
-            </Button>
+            <SignInButton>
+              <Button
+                className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+                data-testid="button-login"
+              >
+                Sign In
+              </Button>
+            </SignInButton>
           </div>
         </div>
       </header>
@@ -35,27 +37,32 @@ export default function Landing() {
               <Star className="h-4 w-4 mr-2" />
               AI-Powered News Curation Across All Categories
             </Badge>
-            
+
             <h1 className="text-5xl md:text-6xl font-bold text-slate-900 mb-6 leading-tight">
               Stay Informed, Stay
-              <span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent"> Positive</span>
+              <span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                {" "}
+                Positive
+              </span>
             </h1>
-            
+
             <p className="text-xl text-slate-600 mb-8 leading-relaxed">
-              BrightBuzz curates news from all categories using AI to filter out anxiety-inducing content, 
-              keeping you informed across world news, technology, sports, entertainment, health, and more while protecting your mental health.
+              BrightBuzz curates news from all categories using AI to filter out anxiety-inducing
+              content, keeping you informed across world news, technology, sports, entertainment,
+              health, and more while protecting your mental health.
             </p>
-            
+
             <div className="flex flex-col items-center justify-center gap-4 mb-4">
               <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-                <Button 
-                  size="lg" 
-                  onClick={() => window.location.href = '/api/login'}
-                  className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 px-8 py-3 text-lg"
-                  data-testid="button-get-started"
-                >
-                  Get Started Free
-                </Button>
+                <SignInButton>
+                  <Button
+                    size="lg"
+                    className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 px-8 py-3 text-lg"
+                    data-testid="button-get-started"
+                  >
+                    Get Started Free
+                  </Button>
+                </SignInButton>
                 <Button variant="outline" size="lg" className="px-8 py-3 text-lg">
                   Learn More
                 </Button>
@@ -100,7 +107,8 @@ export default function Landing() {
               </div>
               <h3 className="text-xl font-semibold text-slate-900 mb-4">Smart Filtering</h3>
               <p className="text-slate-600 leading-relaxed">
-                AI-powered sentiment analysis removes anxiety-inducing content while preserving important updates across all news categories that matter to you.
+                AI-powered sentiment analysis removes anxiety-inducing content while preserving
+                important updates across all news categories that matter to you.
               </p>
             </Card>
 
@@ -110,7 +118,8 @@ export default function Landing() {
               </div>
               <h3 className="text-xl font-semibold text-slate-900 mb-4">Real-Time Curation</h3>
               <p className="text-slate-600 leading-relaxed">
-                Get comprehensive news coverage curated from trusted sources like Reuters, BBC, CNN, ESPN, and dozens of other quality publications.
+                Get comprehensive news coverage curated from trusted sources like Reuters, BBC, CNN,
+                ESPN, and dozens of other quality publications.
               </p>
             </Card>
 
@@ -120,7 +129,8 @@ export default function Landing() {
               </div>
               <h3 className="text-xl font-semibold text-slate-900 mb-4">Daily Podcasts</h3>
               <p className="text-slate-600 leading-relaxed">
-                Daily 5-10 minute podcasts summarizing the most important stories across all categories with balanced, comprehensive coverage.
+                Daily 5-10 minute podcasts summarizing the most important stories across all
+                categories with balanced, comprehensive coverage.
               </p>
             </Card>
           </div>
@@ -136,14 +146,15 @@ export default function Landing() {
               Join thousands of readers who stay informed across all topics without the anxiety.
             </p>
             <div className="flex flex-col items-center gap-3">
-              <Button 
-                size="lg" 
-                onClick={() => window.location.href = '/login'}
-                className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 px-8 py-3 text-lg"
-                data-testid="button-cta-signup"
-              >
-                Start Your Free Account
-              </Button>
+              <SignInButton>
+                <Button
+                  size="lg"
+                  className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 px-8 py-3 text-lg"
+                  data-testid="button-cta-signup"
+                >
+                  Start Your Free Account
+                </Button>
+              </SignInButton>
               <p className="text-sm text-slate-500">
                 Sign in with Gmail, Apple, GitHub, X, or email
               </p>
@@ -162,9 +173,7 @@ export default function Landing() {
               </div>
               <span className="text-xl font-bold text-white">BrightBuzz</span>
             </div>
-            <p className="text-slate-400">
-              AI-powered news curation across all categories
-            </p>
+            <p className="text-slate-400">AI-powered news curation across all categories</p>
           </div>
         </div>
       </footer>
