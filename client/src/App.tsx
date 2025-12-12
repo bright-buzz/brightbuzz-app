@@ -13,25 +13,39 @@ import NotFound from "@/pages/not-found";
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
 
+  // While auth is loading, show landing (or you can swap to a spinner later)
+  if (isLoading) {
+    return (
+      <Switch>
+        <Route path="/" component={Landing} />
+        <Route component={NotFound} />
+      </Switch>
+    );
+  }
+
+  // Not signed in: only allow Landing at "/"
+  if (!isAuthenticated) {
+    return (
+      <Switch>
+        <Route path="/" component={Landing} />
+        <Route component={NotFound} />
+      </Switch>
+    );
+  }
+
+  // Signed in: allow app routes
   return (
     <Switch>
-      {isLoading || !isAuthenticated ? (
-        <Route path="/" component={Landing} />
-      ) : (
-        <>
-<>
-  <Route path="/" component={Home} />
-  <Route path="/home" component={Home} />
-  <Route path="/settings" component={Settings} />
-  <Route path="/saved" component={Saved} />
-</>
-      )}
+      <Route path="/" component={Home} />
+      <Route path="/home" component={Home} />
+      <Route path="/settings" component={Settings} />
+      <Route path="/saved" component={Saved} />
       <Route component={NotFound} />
     </Switch>
   );
 }
 
-function App() {
+export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
@@ -41,5 +55,3 @@ function App() {
     </QueryClientProvider>
   );
 }
-
-export default App;
