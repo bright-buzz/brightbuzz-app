@@ -19,10 +19,12 @@ function Router() {
         <Route path="/" component={Landing} />
       ) : (
         <>
-          <Route path="/" component={Home} />
-          <Route path="/settings" component={Settings} />
-          <Route path="/saved" component={Saved} />
-        </>
+<>
+  <Route path="/" component={Home} />
+  <Route path="/home" component={Home} />
+  <Route path="/settings" component={Settings} />
+  <Route path="/saved" component={Saved} />
+</>
       )}
       <Route component={NotFound} />
     </Switch>
