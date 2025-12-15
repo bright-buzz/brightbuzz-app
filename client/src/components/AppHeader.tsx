@@ -1,14 +1,9 @@
 import { Newspaper, Shield, Settings, Bookmark } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { UserButton, SignedIn } from "@clerk/clerk-react";
+
+// Clerk
+import { UserButton, SignedIn, SignedOut, SignInButton } from "@clerk/clerk-react";
 
 interface AppHeaderProps {
   filteredCount?: number;
@@ -25,10 +20,7 @@ export function AppHeader({ filteredCount }: AppHeaderProps) {
               <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
                 <Newspaper className="text-white text-sm" />
               </div>
-              <h1
-                className="text-xl font-bold text-slate-900"
-                data-testid="text-app-title"
-              >
+              <h1 className="text-xl font-bold text-slate-900" data-testid="text-app-title">
                 BrightBuzz
               </h1>
             </div>
@@ -42,36 +34,38 @@ export function AppHeader({ filteredCount }: AppHeaderProps) {
             {filteredCount !== undefined && (
               <div className="hidden md:flex items-center space-x-2 bg-slate-100 rounded-full px-3 py-1">
                 <Shield className="text-secondary text-sm" />
-                <span
-                  className="text-sm font-medium text-slate-700"
-                  data-testid="text-filtered-count"
-                >
+                <span className="text-sm font-medium text-slate-700" data-testid="text-filtered-count">
                   {filteredCount} articles filtered today
                 </span>
               </div>
             )}
 
-            <Link href="/saved">
-              <Button variant="outline" data-testid="button-saved">
-                <Bookmark className="text-sm mr-2" />
-                <span className="hidden sm:block">Saved</span>
-              </Button>
-            </Link>
-
-            <Link href="/settings">
-              <Button
-                className="bg-primary hover:bg-blue-700"
-                data-testid="button-settings"
-              >
-                <Settings className="text-sm mr-2" />
-                <span className="hidden sm:block">Settings</span>
-              </Button>
-            </Link>
-
-            {/* Clerk user menu */}
             <SignedIn>
+              <Link href="/saved">
+                <Button variant="outline" data-testid="button-saved">
+                  <Bookmark className="text-sm mr-2" />
+                  <span className="hidden sm:block">Saved</span>
+                </Button>
+              </Link>
+
+              <Link href="/settings">
+                <Button className="bg-primary hover:bg-blue-700" data-testid="button-settings">
+                  <Settings className="text-sm mr-2" />
+                  <span className="hidden sm:block">Settings</span>
+                </Button>
+              </Link>
+
+              {/* Clerk user menu includes "Sign out" */}
               <UserButton afterSignOutUrl="/" />
             </SignedIn>
+
+            <SignedOut>
+              <SignInButton mode="modal">
+                <Button className="bg-primary hover:bg-blue-700" data-testid="button-signin">
+                  Sign In
+                </Button>
+              </SignInButton>
+            </SignedOut>
           </div>
         </div>
       </div>
