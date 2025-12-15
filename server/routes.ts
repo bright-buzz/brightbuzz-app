@@ -3,20 +3,21 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { newsService } from "./services/newsService";
 import { podcastService } from "./services/podcastService";
-import { setupAuth, isAuthenticated } from "./replitAuth";
 import { insertKeywordSchema, insertReplacementPatternSchema } from "@shared/schema";
 import type { FilterPreview } from "@shared/schema";
-import { applyFilters, applyReplacementsOnly } from "./services/filteringService";
+import { applyFilters } from "./services/filteringService";
+
+// ✅ Clerk
+import { clerkMiddleware, requireAuth, getAuth } from "@clerk/express";
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Auth middleware
-if (process.env.NODE_ENV === "development") {
-  await setupAuth(app);
-}
-  // Auth routes
-  app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
+  // ✅ Clerk auth middleware (adds req.auth, verifies Clerk tokens when present)
+  app.use(clerkMiddleware());
+
+  // ✅ Auth routes
+  app.get("/api/auth/user", requireAuth(), async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.auth.userId; // ✅ Clerk userId
       const user = await storage.getUser(userId);
       res.json(user);
     } catch (error) {
@@ -24,7 +25,8 @@ if (process.env.NODE_ENV === "development") {
       res.status(500).json({ message: "Failed to fetch user" });
     }
   });
-  // Articles endpoints
+
+  // ✅ Articles endpoints (public)
   app.get("/api/articles", async (req, res) => {
     try {
       const articles = await storage.getArticles();
@@ -36,14 +38,18 @@ if (process.env.NODE_ENV === "development") {
 
   app.get("/api/articles/curated", async (req: any, res) => {
     try {
-      const userId = req.isAuthenticated() ? req.user.claims.sub : undefined;
+      // ✅ Optional auth: userId may be null if not signed in
+      const { userId } = getAuth(req);
       const articles = await storage.getCuratedArticles();
-      
-      // Apply centralized filtering pipeline (date, blocked keywords, prioritized keywords, replacements, sentiment, deduplication)
-      const filtered = await applyFilters(articles, userId);
-      
-      console.log(`Curated endpoint: ${articles.length} curated articles -> ${filtered.length} after filtering (user ${userId || 'anonymous'})`);
-      
+
+      const filtered = await applyFilters(articles, userId || undefined);
+
+      console.log(
+        `Curated endpoint: ${articles.length} curated articles -> ${filtered.length} after filtering (user ${
+          userId || "anonymous"
+        })`
+      );
+
       res.json(filtered);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch curated articles" });
@@ -52,14 +58,17 @@ if (process.env.NODE_ENV === "development") {
 
   app.get("/api/articles/filtered", async (req: any, res) => {
     try {
-      const userId = req.isAuthenticated() ? req.user.claims.sub : undefined;
+      const { userId } = getAuth(req);
       const curatedArticles = await storage.getCuratedArticles();
-      
-      // Apply centralized filtering pipeline
-      const filtered = await applyFilters(curatedArticles, userId);
 
-      console.log(`Filtered endpoint: ${curatedArticles.length} curated articles -> ${filtered.length} after filtering (user ${userId || 'anonymous'})`);
-      
+      const filtered = await applyFilters(curatedArticles, userId || undefined);
+
+      console.log(
+        `Filtered endpoint: ${curatedArticles.length} curated articles -> ${filtered.length} after filtering (user ${
+          userId || "anonymous"
+        })`
+      );
+
       res.json(filtered);
     } catch (error) {
       console.error("Failed to fetch filtered articles:", error);
@@ -69,14 +78,17 @@ if (process.env.NODE_ENV === "development") {
 
   app.get("/api/articles/top-five", async (req: any, res) => {
     try {
-      const userId = req.isAuthenticated() ? req.user.claims.sub : undefined;
+      const { userId } = getAuth(req);
       const articles = await storage.getTopFiveArticles();
-      
-      // Apply centralized filtering pipeline (includes replacements and all filters)
-      const filtered = await applyFilters(articles, userId);
 
-      console.log(`Top-five endpoint: ${articles.length} articles -> ${filtered.length} after filtering (user ${userId || 'anonymous'})`);
-      
+      const filtered = await applyFilters(articles, userId || undefined);
+
+      console.log(
+        `Top-five endpoint: ${articles.length} articles -> ${filtered.length} after filtering (user ${
+          userId || "anonymous"
+        })`
+      );
+
       res.json(filtered);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch top five articles" });
@@ -86,8 +98,8 @@ if (process.env.NODE_ENV === "development") {
   app.post("/api/articles/:id/view", async (req, res) => {
     try {
       const { id } = req.params;
-      const article = await storage.updateArticle(id, { 
-        views: (await storage.getArticles()).find(a => a.id === id)?.views || 0 + 1 
+      const article = await storage.updateArticle(id, {
+        views: (await storage.getArticles()).find((a) => a.id === id)?.views || 0 + 1,
       });
       res.json(article);
     } catch (error) {
@@ -95,11 +107,11 @@ if (process.env.NODE_ENV === "development") {
     }
   });
 
-  // Article likes endpoints
-  app.post("/api/articles/:id/like", isAuthenticated, async (req: any, res) => {
+  // ✅ Article likes endpoints (protected)
+  app.post("/api/articles/:id/like", requireAuth(), async (req: any, res) => {
     try {
       const { id } = req.params;
-      const userId = req.user.claims.sub;
+      const userId = req.auth.userId;
       const result = await storage.likeArticle(id, userId);
       res.json(result);
     } catch (error) {
@@ -108,10 +120,10 @@ if (process.env.NODE_ENV === "development") {
     }
   });
 
-  app.post("/api/articles/:id/unlike", isAuthenticated, async (req: any, res) => {
+  app.post("/api/articles/:id/unlike", requireAuth(), async (req: any, res) => {
     try {
       const { id } = req.params;
-      const userId = req.user.claims.sub;
+      const userId = req.auth.userId;
       const result = await storage.unlikeArticle(id, userId);
       res.json(result);
     } catch (error) {
@@ -120,10 +132,10 @@ if (process.env.NODE_ENV === "development") {
     }
   });
 
-  app.get("/api/articles/:id/liked", isAuthenticated, async (req: any, res) => {
+  app.get("/api/articles/:id/liked", requireAuth(), async (req: any, res) => {
     try {
       const { id } = req.params;
-      const userId = req.user.claims.sub;
+      const userId = req.auth.userId;
       const isLiked = await storage.isArticleLikedByUser(id, userId);
       res.json({ isLiked });
     } catch (error) {
@@ -132,9 +144,9 @@ if (process.env.NODE_ENV === "development") {
     }
   });
 
-  app.get("/api/user/liked-articles", isAuthenticated, async (req: any, res) => {
+  app.get("/api/user/liked-articles", requireAuth(), async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.auth.userId;
       const likedArticleIds = await storage.getUserLikedArticles(userId);
       res.json(likedArticleIds);
     } catch (error) {
@@ -143,11 +155,11 @@ if (process.env.NODE_ENV === "development") {
     }
   });
 
-  // Saved articles endpoints
-  app.post("/api/articles/:id/save", isAuthenticated, async (req: any, res) => {
+  // ✅ Saved articles endpoints (protected)
+  app.post("/api/articles/:id/save", requireAuth(), async (req: any, res) => {
     try {
       const { id } = req.params;
-      const userId = req.user.claims.sub;
+      const userId = req.auth.userId;
       const result = await storage.saveArticle(id, userId);
       res.json(result);
     } catch (error) {
@@ -156,10 +168,10 @@ if (process.env.NODE_ENV === "development") {
     }
   });
 
-  app.post("/api/articles/:id/unsave", isAuthenticated, async (req: any, res) => {
+  app.post("/api/articles/:id/unsave", requireAuth(), async (req: any, res) => {
     try {
       const { id } = req.params;
-      const userId = req.user.claims.sub;
+      const userId = req.auth.userId;
       const result = await storage.unsaveArticle(id, userId);
       res.json(result);
     } catch (error) {
@@ -168,10 +180,10 @@ if (process.env.NODE_ENV === "development") {
     }
   });
 
-  app.get("/api/articles/:id/saved", isAuthenticated, async (req: any, res) => {
+  app.get("/api/articles/:id/saved", requireAuth(), async (req: any, res) => {
     try {
       const { id } = req.params;
-      const userId = req.user.claims.sub;
+      const userId = req.auth.userId;
       const isSaved = await storage.isArticleSavedByUser(id, userId);
       res.json({ isSaved });
     } catch (error) {
@@ -180,16 +192,17 @@ if (process.env.NODE_ENV === "development") {
     }
   });
 
-  app.get("/api/saved-articles", isAuthenticated, async (req: any, res) => {
+  app.get("/api/saved-articles", requireAuth(), async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.auth.userId;
       const savedArticles = await storage.getSavedArticles(userId);
-      
-      // Apply centralized filtering pipeline
+
       const filtered = await applyFilters(savedArticles, userId);
-      
-      console.log(`Saved articles endpoint: ${savedArticles.length} articles -> ${filtered.length} after filtering (user ${userId})`);
-      
+
+      console.log(
+        `Saved articles endpoint: ${savedArticles.length} articles -> ${filtered.length} after filtering (user ${userId})`
+      );
+
       res.json(filtered);
     } catch (error) {
       console.error("Error fetching saved articles:", error);
@@ -197,18 +210,19 @@ if (process.env.NODE_ENV === "development") {
     }
   });
 
-  // Article Feedback endpoints
-  app.post("/api/articles/:id/feedback", isAuthenticated, async (req: any, res) => {
+  // ✅ Article Feedback endpoints (protected)
+  app.post("/api/articles/:id/feedback", requireAuth(), async (req: any, res) => {
     try {
       const { id } = req.params;
       const { feedback } = req.body;
-      const userId = req.user.claims.sub;
-      
-      // Validate feedback type
-      if (feedback !== 'thumbs_up' && feedback !== 'thumbs_down') {
-        return res.status(400).json({ message: "Invalid feedback type. Must be 'thumbs_up' or 'thumbs_down'" });
+      const userId = req.auth.userId;
+
+      if (feedback !== "thumbs_up" && feedback !== "thumbs_down") {
+        return res
+          .status(400)
+          .json({ message: "Invalid feedback type. Must be 'thumbs_up' or 'thumbs_down'" });
       }
-      
+
       const result = await storage.saveFeedback(userId, id, feedback);
       res.json(result);
     } catch (error) {
@@ -217,10 +231,10 @@ if (process.env.NODE_ENV === "development") {
     }
   });
 
-  app.delete("/api/articles/:id/feedback", isAuthenticated, async (req: any, res) => {
+  app.delete("/api/articles/:id/feedback", requireAuth(), async (req: any, res) => {
     try {
       const { id } = req.params;
-      const userId = req.user.claims.sub;
+      const userId = req.auth.userId;
       const result = await storage.removeFeedback(userId, id);
       res.json(result);
     } catch (error) {
@@ -229,10 +243,10 @@ if (process.env.NODE_ENV === "development") {
     }
   });
 
-  app.get("/api/articles/:id/feedback", isAuthenticated, async (req: any, res) => {
+  app.get("/api/articles/:id/feedback", requireAuth(), async (req: any, res) => {
     try {
       const { id } = req.params;
-      const userId = req.user.claims.sub;
+      const userId = req.auth.userId;
       const feedback = await storage.getFeedback(userId, id);
       res.json(feedback || { feedback: null });
     } catch (error) {
@@ -241,9 +255,9 @@ if (process.env.NODE_ENV === "development") {
     }
   });
 
-  app.get("/api/user/feedback", isAuthenticated, async (req: any, res) => {
+  app.get("/api/user/feedback", requireAuth(), async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.auth.userId;
       const feedbackList = await storage.getUserFeedback(userId);
       res.json(feedbackList);
     } catch (error) {
@@ -252,7 +266,7 @@ if (process.env.NODE_ENV === "development") {
     }
   });
 
-  // Keywords endpoints
+  // ✅ Keywords endpoints (public)
   app.get("/api/keywords", async (req, res) => {
     try {
       const keywords = await storage.getKeywords();
@@ -296,14 +310,14 @@ if (process.env.NODE_ENV === "development") {
     }
   });
 
-  // Replacement patterns endpoints
+  // ✅ Replacement patterns endpoints (mixed: list can be empty if not signed in)
   app.get("/api/replacement-patterns", async (req: any, res) => {
     try {
-      if (!req.isAuthenticated()) {
+      const { userId } = getAuth(req);
+      if (!userId) {
         res.json([]);
         return;
       }
-      const userId = req.user.claims.sub;
       const patterns = await storage.getReplacementPatterns(userId);
       res.json(patterns);
     } catch (error) {
@@ -311,12 +325,12 @@ if (process.env.NODE_ENV === "development") {
     }
   });
 
-  app.post("/api/replacement-patterns", isAuthenticated, async (req: any, res) => {
+  app.post("/api/replacement-patterns", requireAuth(), async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.auth.userId;
       const patternData = insertReplacementPatternSchema.parse({
         ...req.body,
-        userId
+        userId,
       });
       const pattern = await storage.createReplacementPattern(patternData);
       res.json(pattern);
@@ -325,20 +339,19 @@ if (process.env.NODE_ENV === "development") {
     }
   });
 
-  app.delete("/api/replacement-patterns/:id", isAuthenticated, async (req: any, res) => {
+  app.delete("/api/replacement-patterns/:id", requireAuth(), async (req: any, res) => {
     try {
       const { id } = req.params;
-      const userId = req.user.claims.sub;
-      
-      // Verify ownership before deletion
+      const userId = req.auth.userId;
+
       const existingPatterns = await storage.getReplacementPatterns(userId);
-      const pattern = existingPatterns.find(p => p.id === id);
-      
+      const pattern = existingPatterns.find((p) => p.id === id);
+
       if (!pattern) {
         res.status(404).json({ message: "Replacement pattern not found" });
         return;
       }
-      
+
       const deleted = await storage.deleteReplacementPattern(id);
       if (deleted) {
         res.json({ success: true });
@@ -350,11 +363,11 @@ if (process.env.NODE_ENV === "development") {
     }
   });
 
-  // User preferences endpoints
+  // ✅ User preferences endpoints (public / optional user)
   app.get("/api/preferences", async (req: any, res) => {
     try {
-      const userId = req.isAuthenticated() ? req.user.claims.sub : undefined;
-      const preferences = await storage.getUserPreferences(userId);
+      const { userId } = getAuth(req);
+      const preferences = await storage.getUserPreferences(userId || undefined);
       res.json(preferences);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch preferences" });
@@ -363,82 +376,76 @@ if (process.env.NODE_ENV === "development") {
 
   app.put("/api/preferences", async (req: any, res) => {
     try {
-      const userId = req.isAuthenticated() ? req.user.claims.sub : undefined;
-      const preferences = await storage.updateUserPreferences(req.body, userId);
+      const { userId } = getAuth(req);
+      const preferences = await storage.updateUserPreferences(req.body, userId || undefined);
       res.json(preferences);
     } catch (error) {
       res.status(500).json({ message: "Failed to update preferences" });
     }
   });
 
-  // Filter preview endpoint  
+  // ✅ Filter preview endpoint (public / optional user)
   app.get("/api/filter-preview", async (req: any, res) => {
     try {
-      const userId = req.isAuthenticated() ? req.user.claims.sub : undefined;
-      const preferences = await storage.getUserPreferences(userId);
+      const { userId } = getAuth(req);
+      const preferences = await storage.getUserPreferences(userId || undefined);
       const articles = await storage.getArticles();
-      
-      // Apply replacement patterns first - fetch once and reuse
+
       let replacementPatterns: any[] = [];
       try {
-        replacementPatterns = await storage.getReplacementPatterns(userId);
+        replacementPatterns = await storage.getReplacementPatterns(userId || undefined);
       } catch (error) {
-        console.error('Failed to fetch replacement patterns:', error);
+        console.error("Failed to fetch replacement patterns:", error);
       }
 
       const applyReplacementPatterns = (text: string): string => {
         let transformedText = text;
-        
+
         for (const pattern of replacementPatterns) {
-          // Escape user input for literal replacement to prevent ReDoS
-          const escapedFind = pattern.findText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-          // Respect caseSensitive flag
-          const flags = pattern.caseSensitive ? 'g' : 'gi';
+          const escapedFind = pattern.findText.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+          const flags = pattern.caseSensitive ? "g" : "gi";
           const regex = new RegExp(escapedFind, flags);
           transformedText = transformedText.replace(regex, pattern.replaceText);
         }
-        
+
         return transformedText;
       };
 
       const transformedArticles = articles.map((article) => ({
         ...article,
         title: applyReplacementPatterns(article.title),
-        summary: applyReplacementPatterns(article.summary)
+        summary: applyReplacementPatterns(article.summary),
       }));
 
-      const blockedKeywords = await storage.getKeywordsByType('blocked');
-      const blocked = blockedKeywords.map(kw => kw.keyword.toLowerCase());
-      
-      // Simple filtering logic after applying replacement patterns
-      const filtered = transformedArticles.filter(article => {
-        // Check sentiment threshold
-        if (article.sentiment < (preferences?.sentimentThreshold || 0.7)) {
-          return false;
-        }
-        
-        // Check blocked keywords
+      const blockedKeywords = await storage.getKeywordsByType("blocked");
+      const blocked = blockedKeywords.map((kw) => kw.keyword.toLowerCase());
+
+      const filtered = transformedArticles.filter((article) => {
+        if (article.sentiment < (preferences?.sentimentThreshold || 0.7)) return false;
+
         const articleText = `${article.title} ${article.summary}`.toLowerCase();
-        const hasBlockedKeyword = blocked.some(blockedTerm => 
-          articleText.includes(blockedTerm) ||
-          (article.keywords || []).some((kw: string) => kw.toLowerCase().includes(blockedTerm))
+        const hasBlockedKeyword = blocked.some(
+          (blockedTerm) =>
+            articleText.includes(blockedTerm) ||
+            (article.keywords || []).some((kw: string) => kw.toLowerCase().includes(blockedTerm))
         );
-        
+
         return !hasBlockedKeyword;
       });
-      
+
       const preview: FilterPreview = {
-        original: articles.slice(0, 20), // Limit for UI performance
+        original: articles.slice(0, 20),
         filtered: filtered.slice(0, 20),
         stats: {
           totalArticles: articles.length,
           filteredCount: articles.length - filtered.length,
           passedCount: filtered.length,
           avgSentiment: filtered.length > 0 ? filtered.reduce((sum, a) => sum + a.sentiment, 0) / filtered.length : 0,
-          anxietyReduction: articles.length > 0 ? Math.round(((articles.length - filtered.length) / articles.length) * 100) : 0
-        }
+          anxietyReduction:
+            articles.length > 0 ? Math.round(((articles.length - filtered.length) / articles.length) * 100) : 0,
+        },
       };
-      
+
       res.json(preview);
     } catch (error) {
       console.error("Filter preview error:", error);
@@ -449,58 +456,51 @@ if (process.env.NODE_ENV === "development") {
   app.post("/api/filter-preview", async (req: any, res) => {
     try {
       const { sentimentThreshold } = req.body;
-      const userId = req.isAuthenticated() ? req.user.claims.sub : undefined;
+      const { userId } = getAuth(req);
       const articles = await storage.getArticles();
-      
-      // Apply replacement patterns first - fetch once and reuse
+
       let replacementPatterns: any[] = [];
       try {
-        replacementPatterns = await storage.getReplacementPatterns(userId);
+        replacementPatterns = await storage.getReplacementPatterns(userId || undefined);
       } catch (error) {
-        console.error('Failed to fetch replacement patterns:', error);
+        console.error("Failed to fetch replacement patterns:", error);
       }
 
       const applyReplacementPatterns = (text: string): string => {
         let transformedText = text;
-        
+
         for (const pattern of replacementPatterns) {
-          // Escape user input for literal replacement to prevent ReDoS
-          const escapedFind = pattern.findText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-          // Respect caseSensitive flag
-          const flags = pattern.caseSensitive ? 'g' : 'gi';
+          const escapedFind = pattern.findText.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+          const flags = pattern.caseSensitive ? "g" : "gi";
           const regex = new RegExp(escapedFind, flags);
           transformedText = transformedText.replace(regex, pattern.replaceText);
         }
-        
+
         return transformedText;
       };
 
       const transformedArticles = articles.map((article) => ({
         ...article,
         title: applyReplacementPatterns(article.title),
-        summary: applyReplacementPatterns(article.summary)
+        summary: applyReplacementPatterns(article.summary),
       }));
 
-      const blockedKeywords = await storage.getKeywordsByType('blocked');
-      const blocked = blockedKeywords.map(kw => kw.keyword.toLowerCase());
-      
-      // Simple filtering logic with custom threshold after applying replacement patterns
-      const filtered = transformedArticles.filter(article => {
-        // Check sentiment threshold
-        if (article.sentiment < (sentimentThreshold || 0.7)) {
-          return false;
-        }
-        
-        // Check blocked keywords
+      const blockedKeywords = await storage.getKeywordsByType("blocked");
+      const blocked = blockedKeywords.map((kw) => kw.keyword.toLowerCase());
+
+      const filtered = transformedArticles.filter((article) => {
+        if (article.sentiment < (sentimentThreshold || 0.7)) return false;
+
         const articleText = `${article.title} ${article.summary}`.toLowerCase();
-        const hasBlockedKeyword = blocked.some(blockedTerm => 
-          articleText.includes(blockedTerm) ||
-          (article.keywords || []).some((kw: string) => kw.toLowerCase().includes(blockedTerm))
+        const hasBlockedKeyword = blocked.some(
+          (blockedTerm) =>
+            articleText.includes(blockedTerm) ||
+            (article.keywords || []).some((kw: string) => kw.toLowerCase().includes(blockedTerm))
         );
-        
+
         return !hasBlockedKeyword;
       });
-      
+
       const preview: FilterPreview = {
         original: articles.slice(0, 20),
         filtered: filtered.slice(0, 20),
@@ -509,10 +509,11 @@ if (process.env.NODE_ENV === "development") {
           filteredCount: articles.length - filtered.length,
           passedCount: filtered.length,
           avgSentiment: filtered.length > 0 ? filtered.reduce((sum, a) => sum + a.sentiment, 0) / filtered.length : 0,
-          anxietyReduction: articles.length > 0 ? Math.round(((articles.length - filtered.length) / articles.length) * 100) : 0
-        }
+          anxietyReduction:
+            articles.length > 0 ? Math.round(((articles.length - filtered.length) / articles.length) * 100) : 0,
+        },
       };
-      
+
       res.json(preview);
     } catch (error) {
       console.error("Filter preview error:", error);
@@ -520,7 +521,7 @@ if (process.env.NODE_ENV === "development") {
     }
   });
 
-  // Trigger news fetch
+  // ✅ Trigger news fetch (public)
   app.post("/api/fetch-news", async (req, res) => {
     try {
       const { force } = req.body;
@@ -531,7 +532,7 @@ if (process.env.NODE_ENV === "development") {
     }
   });
 
-  // Podcast endpoints
+  // ✅ Podcast endpoints (public)
   app.get("/api/podcasts", async (req, res) => {
     try {
       console.log("=== PODCAST ROUTE CALLED ===");
