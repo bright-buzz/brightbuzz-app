@@ -1,9 +1,18 @@
 import express, { type Request, Response, NextFunction } from "express";
+import cors from "cors";
 import { registerRoutes } from "./routes";
 import { newsService } from "./services/newsService";
 
 const log = console.log;
 const app = express();
+
+// ✅ CORS: allow Vercel frontend to call this Render backend
+app.use(
+  cors({
+    origin: ["https://brightbuzz.vercel.app"],
+    credentials: true,
+  })
+);
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
