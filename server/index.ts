@@ -1,7 +1,10 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
+import { newsService } from "./services/newsService";
+
 const log = console.log;
 const app = express();
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
@@ -35,6 +38,24 @@ app.use((req, res, next) => {
   next();
 });
 
+/**
+ * IMPORTANT:
+ * This endpoint is called by the frontend (Home page) using:
+ *   apiRequest('POST', '/api/fetch-news', { force: true })
+ *
+ * It triggers a server-side refresh of the news pipeline.
+ */
+app.post("/api/fetch-news", async (req, res) => {
+  try {
+    const forceRefresh = Boolean(req.body?.force);
+    await newsService.fetchLatestNews(forceRefresh);
+    res.json({ success: true });
+  } catch (error) {
+    console.error("Error fetching news:", error);
+    res.status(500).json({ error: "Failed to fetch news" });
+  }
+});
+
 (async () => {
   const server = await registerRoutes(app);
 
@@ -53,17 +74,21 @@ app.use((req, res, next) => {
     const { setupVite } = await import("./vite");
     await setupVite(app, server);
   }
-  // In production, the frontend is served by Vercel, not this backend  // In production, the frontend is served by Vercel, not this backend
+
+  // In production, the frontend is served by Vercel, not this backend
   // ALWAYS serve the app on the port specified in the environment variable PORT
   // Other ports are firewalled. Default to 5000 if not specified.
   // this serves both the API and the client.
   // It is the only port that is not firewalled.
-  const port = parseInt(process.env.PORT || '5000', 10);
-  server.listen({
-    port,
-    host: "0.0.0.0",
-    reusePort: true,
-  }, () => {
-    log(`serving on port ${port}`);
-  });
+  const port = parseInt(process.env.PORT || "5000", 10);
+  server.listen(
+    {
+      port,
+      host: "0.0.0.0",
+      reusePort: true,
+    },
+    () => {
+      log(`serving on port ${port}`);
+    }
+  );
 })();
