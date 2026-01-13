@@ -17,16 +17,15 @@ import {
   type ReplacementPattern,
   type InsertReplacementPattern,
   type UserPreferences,
-  type InsertUserPreferences,
   type Podcast,
   type InsertPodcast,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, and, inArray, sql } from "drizzle-orm";
+import { eq, desc, and, or, inArray, sql } from "drizzle-orm";
 import type { IStorage } from "./storage";
 
 export class DatabaseStorage implements IStorage {
-  // User operations (mandatory for Replit Auth)
+  // User operations
   async getUser(id: string): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.id, id));
     return user;
@@ -51,43 +50,46 @@ export class DatabaseStorage implements IStorage {
   private normalizeUrl(url: string): string {
     try {
       const urlObj = new URL(url);
-      // Remove common tracking parameters
-      const trackingParams = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term', 'ref', 'fbclid', 'gclid'];
-      trackingParams.forEach(param => urlObj.searchParams.delete(param));
-      // Normalize: lowercase, remove trailing slash, sort params
+      const trackingParams = [
+        "utm_source",
+        "utm_medium",
+        "utm_campaign",
+        "utm_content",
+        "utm_term",
+        "ref",
+        "fbclid",
+        "gclid",
+      ];
+      trackingParams.forEach((param) => urlObj.searchParams.delete(param));
       urlObj.hostname = urlObj.hostname.toLowerCase();
-      urlObj.pathname = urlObj.pathname.replace(/\/$/, '');
+      urlObj.pathname = urlObj.pathname.replace(/\/$/, "");
       urlObj.searchParams.sort();
       return urlObj.toString();
     } catch {
-      // If URL parsing fails, return lowercase version without trailing slash
-      return url.toLowerCase().replace(/\/$/, '');
+      return url.toLowerCase().replace(/\/$/, "");
     }
   }
 
   // Articles
   async createArticle(insertArticle: InsertArticle): Promise<Article> {
-    // Normalize URL to prevent duplicates with different tracking params
     const normalizedUrl = this.normalizeUrl(insertArticle.url);
-    
-    // Use upsert to prevent duplicates - if URL exists, skip insert
+
     const [article] = await db
       .insert(articles)
       .values({ ...insertArticle, url: normalizedUrl })
       .onConflictDoNothing({ target: articles.url })
       .returning();
-    
-    // If article already exists (conflict), fetch it from DB
+
     if (!article) {
       const [existingArticle] = await db
         .select()
         .from(articles)
         .where(eq(articles.url, normalizedUrl))
         .limit(1);
-      return existingArticle;
+      return existingArticle as any;
     }
-    
-    return article;
+
+    return article as any;
   }
 
   async getArticles(): Promise<Article[]> {
@@ -95,10 +97,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getCuratedArticles(): Promise<Article[]> {
-    return await db
-      .select()
-      .from(articles)
-      .where(eq(articles.isCurated, true));
+    return await db.select().from(articles).where(eq(articles.isCurated, true));
   }
 
   async getTopFiveArticles(): Promise<Article[]> {
@@ -111,12 +110,8 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateArticle(id: string, updates: Partial<Article>): Promise<Article | undefined> {
-    const [article] = await db
-      .update(articles)
-      .set(updates)
-      .where(eq(articles.id, id))
-      .returning();
-    return article;
+    const [article] = await db.update(articles).set(updates).where(eq(articles.id, id)).returning();
+    return article as any;
   }
 
   async clearAllCurationFlags(): Promise<void> {
@@ -126,54 +121,89 @@ export class DatabaseStorage implements IStorage {
       .where(sql`is_curated = true OR is_top_five = true`);
   }
 
+  // ✅ NEW: Bulk curation flags (most reliable long-term)
+  async setCurationFlagsBulk(topFiveIds: string[], curatedIds: string[]): Promise<void> {
+    const topSet = new Set(topFiveIds);
+    const overlap = curatedIds.filter((id) => topSet.has(id));
+    if (overlap.length > 0) {
+      throw new Error(
+        `Curation overlap detected. IDs in both topFive and curated: ${overlap.join(", ")}`
+      );
+    }
+
+    await db.transaction(async (tx) => {
+      // Reset only currently-flagged rows
+      await tx
+        .update(articles)
+        .set({ isCurated: false, isTopFive: false })
+        .where(or(eq(articles.isCurated, true), eq(articles.isTopFive, true)));
+
+      // Set Top Five in one query
+      if (topFiveIds.length > 0) {
+        await tx
+          .update(articles)
+          .set({ isTopFive: true, isCurated: false })
+          .where(inArray(articles.id, topFiveIds));
+      }
+
+      // Set Curated in one query
+      if (curatedIds.length > 0) {
+        await tx
+          .update(articles)
+          .set({ isCurated: true, isTopFive: false })
+          .where(inArray(articles.id, curatedIds));
+      }
+    });
+  }
+
   // Article Likes
-  async likeArticle(articleId: string, userId: string): Promise<{ success: boolean; likes: number }> {
+  async likeArticle(
+    articleId: string,
+    userId: string
+  ): Promise<{ success: boolean; likes: number }> {
     const existingLike = await db
       .select()
       .from(userArticleLikes)
       .where(and(eq(userArticleLikes.userId, userId), eq(userArticleLikes.articleId, articleId)))
       .limit(1);
-    
+
     if (existingLike.length > 0) {
       const article = await db.select().from(articles).where(eq(articles.id, articleId)).limit(1);
-      return { success: false, likes: article[0]?.likes || 0 };
+      return { success: false, likes: (article[0] as any)?.likes || 0 };
     }
-    
-    await db.insert(userArticleLikes).values({ userId, articleId });
-    
-    const [updatedArticle] = await db
-      .update(articles)
-      .set({ likes: db.$count(userArticleLikes, eq(userArticleLikes.articleId, articleId)) })
-      .where(eq(articles.id, articleId))
-      .returning();
-    
+
+    await db.insert(userArticleLikes).values({ userId, articleId } as any);
+
     const count = await db.select().from(userArticleLikes).where(eq(userArticleLikes.articleId, articleId));
     const likes = count.length;
-    await db.update(articles).set({ likes }).where(eq(articles.id, articleId));
-    
+    await db.update(articles).set({ likes } as any).where(eq(articles.id, articleId));
+
     return { success: true, likes };
   }
 
-  async unlikeArticle(articleId: string, userId: string): Promise<{ success: boolean; likes: number }> {
+  async unlikeArticle(
+    articleId: string,
+    userId: string
+  ): Promise<{ success: boolean; likes: number }> {
     const existingLike = await db
       .select()
       .from(userArticleLikes)
       .where(and(eq(userArticleLikes.userId, userId), eq(userArticleLikes.articleId, articleId)))
       .limit(1);
-    
+
     if (existingLike.length === 0) {
       const article = await db.select().from(articles).where(eq(articles.id, articleId)).limit(1);
-      return { success: false, likes: article[0]?.likes || 0 };
+      return { success: false, likes: (article[0] as any)?.likes || 0 };
     }
-    
-    await db.delete(userArticleLikes).where(
-      and(eq(userArticleLikes.userId, userId), eq(userArticleLikes.articleId, articleId))
-    );
-    
+
+    await db
+      .delete(userArticleLikes)
+      .where(and(eq(userArticleLikes.userId, userId), eq(userArticleLikes.articleId, articleId)));
+
     const count = await db.select().from(userArticleLikes).where(eq(userArticleLikes.articleId, articleId));
     const likes = count.length;
-    await db.update(articles).set({ likes }).where(eq(articles.id, articleId));
-    
+    await db.update(articles).set({ likes } as any).where(eq(articles.id, articleId));
+
     return { success: true, likes };
   }
 
@@ -183,7 +213,7 @@ export class DatabaseStorage implements IStorage {
       .from(userArticleLikes)
       .where(and(eq(userArticleLikes.userId, userId), eq(userArticleLikes.articleId, articleId)))
       .limit(1);
-    
+
     return existingLike.length > 0;
   }
 
@@ -192,8 +222,8 @@ export class DatabaseStorage implements IStorage {
       .select({ articleId: userArticleLikes.articleId })
       .from(userArticleLikes)
       .where(eq(userArticleLikes.userId, userId));
-    
-    return likes.map(like => like.articleId);
+
+    return likes.map((like) => like.articleId as any);
   }
 
   // Saved Articles
@@ -203,12 +233,12 @@ export class DatabaseStorage implements IStorage {
       .from(userSavedArticles)
       .where(and(eq(userSavedArticles.userId, userId), eq(userSavedArticles.articleId, articleId)))
       .limit(1);
-    
+
     if (existingSave.length > 0) {
       return { success: false };
     }
-    
-    await db.insert(userSavedArticles).values({ userId, articleId });
+
+    await db.insert(userSavedArticles).values({ userId, articleId } as any);
     return { success: true };
   }
 
@@ -218,15 +248,15 @@ export class DatabaseStorage implements IStorage {
       .from(userSavedArticles)
       .where(and(eq(userSavedArticles.userId, userId), eq(userSavedArticles.articleId, articleId)))
       .limit(1);
-    
+
     if (existingSave.length === 0) {
       return { success: false };
     }
-    
-    await db.delete(userSavedArticles).where(
-      and(eq(userSavedArticles.userId, userId), eq(userSavedArticles.articleId, articleId))
-    );
-    
+
+    await db
+      .delete(userSavedArticles)
+      .where(and(eq(userSavedArticles.userId, userId), eq(userSavedArticles.articleId, articleId)));
+
     return { success: true };
   }
 
@@ -236,7 +266,7 @@ export class DatabaseStorage implements IStorage {
       .from(userSavedArticles)
       .where(and(eq(userSavedArticles.userId, userId), eq(userSavedArticles.articleId, articleId)))
       .limit(1);
-    
+
     return existingSave.length > 0;
   }
 
@@ -246,72 +276,72 @@ export class DatabaseStorage implements IStorage {
       .from(userSavedArticles)
       .where(eq(userSavedArticles.userId, userId))
       .orderBy(desc(userSavedArticles.savedAt));
-    
-    if (savedArticleIds.length === 0) {
-      return [];
-    }
-    
-    const articleIdList = savedArticleIds.map(s => s.articleId);
+
+    if (savedArticleIds.length === 0) return [];
+
+    const articleIdList = savedArticleIds.map((s) => s.articleId as any);
     const savedArticles: Article[] = [];
-    
+
     for (const articleId of articleIdList) {
-      const [article] = await db
-        .select()
-        .from(articles)
-        .where(eq(articles.id, articleId))
-        .limit(1);
-      
-      if (article) {
-        savedArticles.push(article);
-      }
+      const [article] = await db.select().from(articles).where(eq(articles.id, articleId)).limit(1);
+      if (article) savedArticles.push(article as any);
     }
-    
+
     return savedArticles;
   }
 
   // Article Feedback
-  async saveFeedback(userId: string, articleId: string, feedback: 'thumbs_up' | 'thumbs_down'): Promise<{ success: boolean }> {
+  async saveFeedback(
+    userId: string,
+    articleId: string,
+    feedback: "thumbs_up" | "thumbs_down"
+  ): Promise<{ success: boolean }> {
     try {
       await db
         .insert(articleFeedback)
-        .values({ userId, articleId, feedback })
+        .values({ userId, articleId, feedback } as any)
         .onConflictDoUpdate({
-          target: [articleFeedback.userId, articleFeedback.articleId],
+          target: [articleFeedback.userId, articleFeedback.articleId] as any,
           set: {
             feedback,
             updatedAt: new Date(),
-          },
+          } as any,
         });
       return { success: true };
     } catch (error) {
-      console.error('Error saving feedback:', error);
+      console.error("Error saving feedback:", error);
       return { success: false };
     }
   }
 
   async removeFeedback(userId: string, articleId: string): Promise<{ success: boolean }> {
     try {
-      await db.delete(articleFeedback).where(
-        and(eq(articleFeedback.userId, userId), eq(articleFeedback.articleId, articleId))
-      );
+      await db
+        .delete(articleFeedback)
+        .where(and(eq(articleFeedback.userId, userId), eq(articleFeedback.articleId, articleId)));
       return { success: true };
     } catch (error) {
-      console.error('Error removing feedback:', error);
+      console.error("Error removing feedback:", error);
       return { success: false };
     }
   }
 
-  async getFeedback(userId: string, articleId: string): Promise<{ feedback: 'thumbs_up' | 'thumbs_down' } | null> {
+  async getFeedback(
+    userId: string,
+    articleId: string
+  ): Promise<{ feedback: "thumbs_up" | "thumbs_down" } | null> {
     const [result] = await db
       .select({ feedback: articleFeedback.feedback })
       .from(articleFeedback)
       .where(and(eq(articleFeedback.userId, userId), eq(articleFeedback.articleId, articleId)))
       .limit(1);
-    
-    return result ? { feedback: result.feedback as 'thumbs_up' | 'thumbs_down' } : null;
+
+    return result ? { feedback: result.feedback as any } : null;
   }
 
-  async getUserFeedback(userId: string): Promise<Array<{ articleId: string; feedback: 'thumbs_up' | 'thumbs_down'; createdAt: Date }>> {
+  async getUserFeedback(
+    userId: string
+  ): Promise<Array<{ articleId: string; feedback: "thumbs_up" | "thumbs_down"; createdAt: Date }>> {
     const results = await db
       .select({
         articleId: articleFeedback.articleId,
@@ -321,18 +351,18 @@ export class DatabaseStorage implements IStorage {
       .from(articleFeedback)
       .where(eq(articleFeedback.userId, userId))
       .orderBy(desc(articleFeedback.createdAt));
-    
-    return results.map(r => ({
-      articleId: r.articleId,
-      feedback: r.feedback as 'thumbs_up' | 'thumbs_down',
-      createdAt: r.createdAt!,
+
+    return results.map((r) => ({
+      articleId: r.articleId as any,
+      feedback: r.feedback as any,
+      createdAt: r.createdAt as any,
     }));
   }
 
-  async getFeedbackSummaryForArticles(articleIds: string[]): Promise<Map<string, { thumbsUp: number; thumbsDown: number }>> {
-    if (articleIds.length === 0) {
-      return new Map();
-    }
+  async getFeedbackSummaryForArticles(
+    articleIds: string[]
+  ): Promise<Map<string, { thumbsUp: number; thumbsDown: number }>> {
+    if (articleIds.length === 0) return new Map();
 
     const feedbackData = await db
       .select({
@@ -340,35 +370,25 @@ export class DatabaseStorage implements IStorage {
         feedback: articleFeedback.feedback,
       })
       .from(articleFeedback)
-      .where(inArray(articleFeedback.articleId, articleIds));
-    
-    // Build summary map
+      .where(inArray(articleFeedback.articleId, articleIds as any));
+
     const summary = new Map<string, { thumbsUp: number; thumbsDown: number }>();
-    for (const articleId of articleIds) {
-      summary.set(articleId, { thumbsUp: 0, thumbsDown: 0 });
-    }
-    
+    for (const articleId of articleIds) summary.set(articleId, { thumbsUp: 0, thumbsDown: 0 });
+
     for (const row of feedbackData) {
-      const stats = summary.get(row.articleId);
-      if (stats) {
-        if (row.feedback === 'thumbs_up') {
-          stats.thumbsUp++;
-        } else if (row.feedback === 'thumbs_down') {
-          stats.thumbsDown++;
-        }
-      }
+      const stats = summary.get(row.articleId as any);
+      if (!stats) continue;
+      if ((row as any).feedback === "thumbs_up") stats.thumbsUp++;
+      if ((row as any).feedback === "thumbs_down") stats.thumbsDown++;
     }
-    
+
     return summary;
   }
 
   // Keywords
   async createKeyword(insertKeyword: InsertKeyword): Promise<Keyword> {
-    const [keyword] = await db
-      .insert(keywords)
-      .values(insertKeyword)
-      .returning();
-    return keyword;
+    const [keyword] = await db.insert(keywords).values(insertKeyword as any).returning();
+    return keyword as any;
   }
 
   async getKeywords(): Promise<Keyword[]> {
@@ -376,92 +396,74 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getKeywordsByType(type: string): Promise<Keyword[]> {
-    return await db
-      .select()
-      .from(keywords)
-      .where(eq(keywords.type, type));
+    return await db.select().from(keywords).where(eq(keywords.type, type as any));
   }
 
   async deleteKeyword(id: string): Promise<boolean> {
-    const result = await db
-      .delete(keywords)
-      .where(eq(keywords.id, id));
-    return result.rowCount > 0;
+    const result = await db.delete(keywords).where(eq(keywords.id, id));
+    return (result as any).rowCount > 0;
   }
 
   // Replacement Patterns
   async createReplacementPattern(insertPattern: InsertReplacementPattern): Promise<ReplacementPattern> {
-    const [pattern] = await db
-      .insert(replacementPatterns)
-      .values(insertPattern)
-      .returning();
-    return pattern;
+    const [pattern] = await db.insert(replacementPatterns).values(insertPattern as any).returning();
+    return pattern as any;
   }
 
   async getReplacementPatterns(userId?: string): Promise<ReplacementPattern[]> {
-    // Return empty array if no userId - replacements are user-specific only
     if (!userId) return [];
-    return await db
-      .select()
-      .from(replacementPatterns)
-      .where(eq(replacementPatterns.userId, userId));
+    return await db.select().from(replacementPatterns).where(eq(replacementPatterns.userId, userId as any));
   }
 
   async deleteReplacementPattern(id: string): Promise<boolean> {
-    const result = await db
-      .delete(replacementPatterns)
-      .where(eq(replacementPatterns.id, id));
-    return result.rowCount > 0;
+    const result = await db.delete(replacementPatterns).where(eq(replacementPatterns.id, id));
+    return (result as any).rowCount > 0;
   }
 
   // User Preferences
   async getUserPreferences(userId?: string): Promise<UserPreferences | undefined> {
     if (userId) {
-      const [prefs] = await db
-        .select()
-        .from(userPreferences)
-        .where(eq(userPreferences.userId, userId));
-      return prefs;
-    } else {
-      // For non-authenticated users, return default preferences
-      return {
-        id: "default",
-        userId: null,
-        sentimentThreshold: 0.7,
-        realTimeFiltering: true,
-      };
+      const [prefs] = await db.select().from(userPreferences).where(eq(userPreferences.userId, userId as any));
+      return prefs as any;
     }
+
+    return {
+      id: "default",
+      userId: null,
+      sentimentThreshold: 0.7,
+      realTimeFiltering: true,
+    } as any;
   }
 
-  async updateUserPreferences(preferences: Partial<UserPreferences>, userId?: string): Promise<UserPreferences> {
+  async updateUserPreferences(
+    preferences: Partial<UserPreferences>,
+    userId?: string
+  ): Promise<UserPreferences> {
     if (userId) {
       const [updated] = await db
         .insert(userPreferences)
-        .values({ ...preferences, userId })
+        .values({ ...preferences, userId } as any)
         .onConflictDoUpdate({
           target: userPreferences.userId,
-          set: preferences,
+          set: preferences as any,
         })
         .returning();
-      return updated;
-    } else {
-      // For non-authenticated users, return the preferences as-is
-      return {
-        id: "default",
-        userId: null,
-        sentimentThreshold: preferences.sentimentThreshold || 0.7,
-        realTimeFiltering: preferences.realTimeFiltering !== undefined ? preferences.realTimeFiltering : true,
-      };
+      return updated as any;
     }
+
+    return {
+      id: "default",
+      userId: null,
+      sentimentThreshold: (preferences as any).sentimentThreshold || 0.7,
+      realTimeFiltering:
+        (preferences as any).realTimeFiltering !== undefined ? (preferences as any).realTimeFiltering : true,
+    } as any;
   }
 
   // Podcasts
   async createPodcast(insertPodcast: InsertPodcast): Promise<Podcast> {
-    const [podcast] = await db
-      .insert(podcasts)
-      .values(insertPodcast)
-      .returning();
-    return podcast;
+    const [podcast] = await db.insert(podcasts).values(insertPodcast as any).returning();
+    return podcast as any;
   }
 
   async getPodcasts(): Promise<Podcast[]> {
@@ -469,27 +471,17 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getPodcast(id: string): Promise<Podcast | undefined> {
-    const [podcast] = await db
-      .select()
-      .from(podcasts)
-      .where(eq(podcasts.id, id));
-    return podcast;
+    const [podcast] = await db.select().from(podcasts).where(eq(podcasts.id, id));
+    return podcast as any;
   }
 
   async getPodcastByDate(date: string): Promise<Podcast | undefined> {
-    const [podcast] = await db
-      .select()
-      .from(podcasts)
-      .where(eq(podcasts.createdAt, date));
-    return podcast;
+    const [podcast] = await db.select().from(podcasts).where(eq(podcasts.createdAt, date as any));
+    return podcast as any;
   }
 
   async updatePodcast(id: string, updates: Partial<Podcast>): Promise<Podcast | undefined> {
-    const [podcast] = await db
-      .update(podcasts)
-      .set(updates)
-      .where(eq(podcasts.id, id))
-      .returning();
-    return podcast;
+    const [podcast] = await db.update(podcasts).set(updates as any).where(eq(podcasts.id, id)).returning();
+    return podcast as any;
   }
 }
