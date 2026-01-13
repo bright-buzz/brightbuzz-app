@@ -21,11 +21,11 @@ import {
   type InsertPodcast,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, and, or, inArray, sql } from "drizzle-orm";
+import { eq, desc, and, inArray, sql } from "drizzle-orm";
 import type { IStorage } from "./storage";
 
 export class DatabaseStorage implements IStorage {
-  // User operations
+  // User operations (mandatory for Replit Auth)
   async getUser(id: string): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.id, id));
     return user;
@@ -86,10 +86,10 @@ export class DatabaseStorage implements IStorage {
         .from(articles)
         .where(eq(articles.url, normalizedUrl))
         .limit(1);
-      return existingArticle as any;
+      return existingArticle;
     }
 
-    return article as any;
+    return article;
   }
 
   async getArticles(): Promise<Article[]> {
@@ -111,7 +111,7 @@ export class DatabaseStorage implements IStorage {
 
   async updateArticle(id: string, updates: Partial<Article>): Promise<Article | undefined> {
     const [article] = await db.update(articles).set(updates).where(eq(articles.id, id)).returning();
-    return article as any;
+    return article;
   }
 
   async clearAllCurationFlags(): Promise<void> {
@@ -121,24 +121,23 @@ export class DatabaseStorage implements IStorage {
       .where(sql`is_curated = true OR is_top_five = true`);
   }
 
-  // ✅ NEW: Bulk curation flags (most reliable long-term)
+  // ✅ Step 3: Bulk + transactional curation update (most reliable long-term)
   async setCurationFlagsBulk(topFiveIds: string[], curatedIds: string[]): Promise<void> {
-    const topSet = new Set(topFiveIds);
-    const overlap = curatedIds.filter((id) => topSet.has(id));
+    // Safety: ensure no overlap
+    const curatedSet = new Set(curatedIds);
+    const overlap = topFiveIds.filter((id) => curatedSet.has(id));
     if (overlap.length > 0) {
-      throw new Error(
-        `Curation overlap detected. IDs in both topFive and curated: ${overlap.join(", ")}`
-      );
+      throw new Error("Curation overlap detected (topFiveIds and curatedIds share IDs)");
     }
 
     await db.transaction(async (tx) => {
-      // Reset only currently-flagged rows
+      // 1) Clear existing flags (only rows that are currently flagged)
       await tx
         .update(articles)
         .set({ isCurated: false, isTopFive: false })
-        .where(or(eq(articles.isCurated, true), eq(articles.isTopFive, true)));
+        .where(sql`is_curated = true OR is_top_five = true`);
 
-      // Set Top Five in one query
+      // 2) Set top five in one query
       if (topFiveIds.length > 0) {
         await tx
           .update(articles)
@@ -146,7 +145,7 @@ export class DatabaseStorage implements IStorage {
           .where(inArray(articles.id, topFiveIds));
       }
 
-      // Set Curated in one query
+      // 3) Set curated in one query
       if (curatedIds.length > 0) {
         await tx
           .update(articles)
@@ -157,10 +156,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Article Likes
-  async likeArticle(
-    articleId: string,
-    userId: string
-  ): Promise<{ success: boolean; likes: number }> {
+  async likeArticle(articleId: string, userId: string): Promise<{ success: boolean; likes: number }> {
     const existingLike = await db
       .select()
       .from(userArticleLikes)
@@ -169,22 +165,19 @@ export class DatabaseStorage implements IStorage {
 
     if (existingLike.length > 0) {
       const article = await db.select().from(articles).where(eq(articles.id, articleId)).limit(1);
-      return { success: false, likes: (article[0] as any)?.likes || 0 };
+      return { success: false, likes: article[0]?.likes || 0 };
     }
 
-    await db.insert(userArticleLikes).values({ userId, articleId } as any);
+    await db.insert(userArticleLikes).values({ userId, articleId });
 
     const count = await db.select().from(userArticleLikes).where(eq(userArticleLikes.articleId, articleId));
     const likes = count.length;
-    await db.update(articles).set({ likes } as any).where(eq(articles.id, articleId));
+    await db.update(articles).set({ likes }).where(eq(articles.id, articleId));
 
     return { success: true, likes };
   }
 
-  async unlikeArticle(
-    articleId: string,
-    userId: string
-  ): Promise<{ success: boolean; likes: number }> {
+  async unlikeArticle(articleId: string, userId: string): Promise<{ success: boolean; likes: number }> {
     const existingLike = await db
       .select()
       .from(userArticleLikes)
@@ -193,7 +186,7 @@ export class DatabaseStorage implements IStorage {
 
     if (existingLike.length === 0) {
       const article = await db.select().from(articles).where(eq(articles.id, articleId)).limit(1);
-      return { success: false, likes: (article[0] as any)?.likes || 0 };
+      return { success: false, likes: article[0]?.likes || 0 };
     }
 
     await db
@@ -202,7 +195,7 @@ export class DatabaseStorage implements IStorage {
 
     const count = await db.select().from(userArticleLikes).where(eq(userArticleLikes.articleId, articleId));
     const likes = count.length;
-    await db.update(articles).set({ likes } as any).where(eq(articles.id, articleId));
+    await db.update(articles).set({ likes }).where(eq(articles.id, articleId));
 
     return { success: true, likes };
   }
@@ -223,7 +216,7 @@ export class DatabaseStorage implements IStorage {
       .from(userArticleLikes)
       .where(eq(userArticleLikes.userId, userId));
 
-    return likes.map((like) => like.articleId as any);
+    return likes.map((like) => like.articleId);
   }
 
   // Saved Articles
@@ -238,7 +231,7 @@ export class DatabaseStorage implements IStorage {
       return { success: false };
     }
 
-    await db.insert(userSavedArticles).values({ userId, articleId } as any);
+    await db.insert(userSavedArticles).values({ userId, articleId });
     return { success: true };
   }
 
@@ -277,14 +270,16 @@ export class DatabaseStorage implements IStorage {
       .where(eq(userSavedArticles.userId, userId))
       .orderBy(desc(userSavedArticles.savedAt));
 
-    if (savedArticleIds.length === 0) return [];
+    if (savedArticleIds.length === 0) {
+      return [];
+    }
 
-    const articleIdList = savedArticleIds.map((s) => s.articleId as any);
+    const articleIdList = savedArticleIds.map((s) => s.articleId);
     const savedArticles: Article[] = [];
 
     for (const articleId of articleIdList) {
       const [article] = await db.select().from(articles).where(eq(articles.id, articleId)).limit(1);
-      if (article) savedArticles.push(article as any);
+      if (article) savedArticles.push(article);
     }
 
     return savedArticles;
@@ -299,13 +294,13 @@ export class DatabaseStorage implements IStorage {
     try {
       await db
         .insert(articleFeedback)
-        .values({ userId, articleId, feedback } as any)
+        .values({ userId, articleId, feedback })
         .onConflictDoUpdate({
-          target: [articleFeedback.userId, articleFeedback.articleId] as any,
+          target: [articleFeedback.userId, articleFeedback.articleId],
           set: {
             feedback,
             updatedAt: new Date(),
-          } as any,
+          },
         });
       return { success: true };
     } catch (error) {
@@ -316,9 +311,7 @@ export class DatabaseStorage implements IStorage {
 
   async removeFeedback(userId: string, articleId: string): Promise<{ success: boolean }> {
     try {
-      await db
-        .delete(articleFeedback)
-        .where(and(eq(articleFeedback.userId, userId), eq(articleFeedback.articleId, articleId)));
+      await db.delete(articleFeedback).where(and(eq(articleFeedback.userId, userId), eq(articleFeedback.articleId, articleId)));
       return { success: true };
     } catch (error) {
       console.error("Error removing feedback:", error);
@@ -336,7 +329,7 @@ export class DatabaseStorage implements IStorage {
       .where(and(eq(articleFeedback.userId, userId), eq(articleFeedback.articleId, articleId)))
       .limit(1);
 
-    return result ? { feedback: result.feedback as any } : null;
+    return result ? { feedback: result.feedback as "thumbs_up" | "thumbs_down" } : null;
   }
 
   async getUserFeedback(
@@ -353,9 +346,9 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(articleFeedback.createdAt));
 
     return results.map((r) => ({
-      articleId: r.articleId as any,
-      feedback: r.feedback as any,
-      createdAt: r.createdAt as any,
+      articleId: r.articleId,
+      feedback: r.feedback as "thumbs_up" | "thumbs_down",
+      createdAt: r.createdAt!,
     }));
   }
 
@@ -370,16 +363,19 @@ export class DatabaseStorage implements IStorage {
         feedback: articleFeedback.feedback,
       })
       .from(articleFeedback)
-      .where(inArray(articleFeedback.articleId, articleIds as any));
+      .where(inArray(articleFeedback.articleId, articleIds));
 
     const summary = new Map<string, { thumbsUp: number; thumbsDown: number }>();
-    for (const articleId of articleIds) summary.set(articleId, { thumbsUp: 0, thumbsDown: 0 });
+    for (const articleId of articleIds) {
+      summary.set(articleId, { thumbsUp: 0, thumbsDown: 0 });
+    }
 
     for (const row of feedbackData) {
-      const stats = summary.get(row.articleId as any);
-      if (!stats) continue;
-      if ((row as any).feedback === "thumbs_up") stats.thumbsUp++;
-      if ((row as any).feedback === "thumbs_down") stats.thumbsDown++;
+      const stats = summary.get(row.articleId);
+      if (stats) {
+        if (row.feedback === "thumbs_up") stats.thumbsUp++;
+        else if (row.feedback === "thumbs_down") stats.thumbsDown++;
+      }
     }
 
     return summary;
@@ -387,8 +383,8 @@ export class DatabaseStorage implements IStorage {
 
   // Keywords
   async createKeyword(insertKeyword: InsertKeyword): Promise<Keyword> {
-    const [keyword] = await db.insert(keywords).values(insertKeyword as any).returning();
-    return keyword as any;
+    const [keyword] = await db.insert(keywords).values(insertKeyword).returning();
+    return keyword;
   }
 
   async getKeywords(): Promise<Keyword[]> {
@@ -396,74 +392,70 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getKeywordsByType(type: string): Promise<Keyword[]> {
-    return await db.select().from(keywords).where(eq(keywords.type, type as any));
+    return await db.select().from(keywords).where(eq(keywords.type, type));
   }
 
   async deleteKeyword(id: string): Promise<boolean> {
     const result = await db.delete(keywords).where(eq(keywords.id, id));
-    return (result as any).rowCount > 0;
+    return result.rowCount > 0;
   }
 
   // Replacement Patterns
   async createReplacementPattern(insertPattern: InsertReplacementPattern): Promise<ReplacementPattern> {
-    const [pattern] = await db.insert(replacementPatterns).values(insertPattern as any).returning();
-    return pattern as any;
+    const [pattern] = await db.insert(replacementPatterns).values(insertPattern).returning();
+    return pattern;
   }
 
   async getReplacementPatterns(userId?: string): Promise<ReplacementPattern[]> {
     if (!userId) return [];
-    return await db.select().from(replacementPatterns).where(eq(replacementPatterns.userId, userId as any));
+    return await db.select().from(replacementPatterns).where(eq(replacementPatterns.userId, userId));
   }
 
   async deleteReplacementPattern(id: string): Promise<boolean> {
     const result = await db.delete(replacementPatterns).where(eq(replacementPatterns.id, id));
-    return (result as any).rowCount > 0;
+    return result.rowCount > 0;
   }
 
   // User Preferences
   async getUserPreferences(userId?: string): Promise<UserPreferences | undefined> {
     if (userId) {
-      const [prefs] = await db.select().from(userPreferences).where(eq(userPreferences.userId, userId as any));
-      return prefs as any;
+      const [prefs] = await db.select().from(userPreferences).where(eq(userPreferences.userId, userId));
+      return prefs;
+    } else {
+      return {
+        id: "default",
+        userId: null,
+        sentimentThreshold: 0.7,
+        realTimeFiltering: true,
+      };
     }
-
-    return {
-      id: "default",
-      userId: null,
-      sentimentThreshold: 0.7,
-      realTimeFiltering: true,
-    } as any;
   }
 
-  async updateUserPreferences(
-    preferences: Partial<UserPreferences>,
-    userId?: string
-  ): Promise<UserPreferences> {
+  async updateUserPreferences(preferences: Partial<UserPreferences>, userId?: string): Promise<UserPreferences> {
     if (userId) {
       const [updated] = await db
         .insert(userPreferences)
-        .values({ ...preferences, userId } as any)
+        .values({ ...preferences, userId })
         .onConflictDoUpdate({
           target: userPreferences.userId,
-          set: preferences as any,
+          set: preferences,
         })
         .returning();
-      return updated as any;
+      return updated;
+    } else {
+      return {
+        id: "default",
+        userId: null,
+        sentimentThreshold: preferences.sentimentThreshold || 0.7,
+        realTimeFiltering: preferences.realTimeFiltering !== undefined ? preferences.realTimeFiltering : true,
+      };
     }
-
-    return {
-      id: "default",
-      userId: null,
-      sentimentThreshold: (preferences as any).sentimentThreshold || 0.7,
-      realTimeFiltering:
-        (preferences as any).realTimeFiltering !== undefined ? (preferences as any).realTimeFiltering : true,
-    } as any;
   }
 
   // Podcasts
   async createPodcast(insertPodcast: InsertPodcast): Promise<Podcast> {
-    const [podcast] = await db.insert(podcasts).values(insertPodcast as any).returning();
-    return podcast as any;
+    const [podcast] = await db.insert(podcasts).values(insertPodcast).returning();
+    return podcast;
   }
 
   async getPodcasts(): Promise<Podcast[]> {
@@ -472,16 +464,16 @@ export class DatabaseStorage implements IStorage {
 
   async getPodcast(id: string): Promise<Podcast | undefined> {
     const [podcast] = await db.select().from(podcasts).where(eq(podcasts.id, id));
-    return podcast as any;
+    return podcast;
   }
 
   async getPodcastByDate(date: string): Promise<Podcast | undefined> {
-    const [podcast] = await db.select().from(podcasts).where(eq(podcasts.createdAt, date as any));
-    return podcast as any;
+    const [podcast] = await db.select().from(podcasts).where(eq(podcasts.createdAt, date));
+    return podcast;
   }
 
   async updatePodcast(id: string, updates: Partial<Podcast>): Promise<Podcast | undefined> {
-    const [podcast] = await db.update(podcasts).set(updates as any).where(eq(podcasts.id, id)).returning();
-    return podcast as any;
+    const [podcast] = await db.update(podcasts).set(updates).where(eq(podcasts.id, id)).returning();
+    return podcast;
   }
 }
