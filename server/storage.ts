@@ -1,11 +1,23 @@
-import { type Article, type InsertArticle, type Keyword, type InsertKeyword, type ReplacementPattern, type InsertReplacementPattern, type UserPreferences, type InsertUserPreferences, type Podcast, type InsertPodcast, type User, type UpsertUser } from "@shared/schema";
+import {
+  type Article,
+  type InsertArticle,
+  type Keyword,
+  type InsertKeyword,
+  type ReplacementPattern,
+  type InsertReplacementPattern,
+  type UserPreferences,
+  type Podcast,
+  type InsertPodcast,
+  type User,
+  type UpsertUser,
+} from "@shared/schema";
 import { randomUUID } from "crypto";
 
 export interface IStorage {
-  // User operations (mandatory for Replit Auth)
+  // User operations
   getUser(id: string): Promise<User | undefined>;
   upsertUser(user: UpsertUser): Promise<User>;
-  
+
   // Articles
   createArticle(article: InsertArticle): Promise<Article>;
   getArticles(): Promise<Article[]>;
@@ -13,41 +25,55 @@ export interface IStorage {
   getTopFiveArticles(): Promise<Article[]>;
   updateArticle(id: string, updates: Partial<Article>): Promise<Article | undefined>;
   clearAllCurationFlags(): Promise<void>;
-  
+
+  // ✅ NEW: Bulk curation flags (most reliable long-term)
+  setCurationFlagsBulk(topFiveIds: string[], curatedIds: string[]): Promise<void>;
+
   // Article Likes
   likeArticle(articleId: string, userId: string): Promise<{ success: boolean; likes: number }>;
   unlikeArticle(articleId: string, userId: string): Promise<{ success: boolean; likes: number }>;
   isArticleLikedByUser(articleId: string, userId: string): Promise<boolean>;
   getUserLikedArticles(userId: string): Promise<string[]>;
-  
+
   // Saved Articles
   saveArticle(articleId: string, userId: string): Promise<{ success: boolean }>;
   unsaveArticle(articleId: string, userId: string): Promise<{ success: boolean }>;
   isArticleSavedByUser(articleId: string, userId: string): Promise<boolean>;
   getSavedArticles(userId: string): Promise<Article[]>;
-  
+
   // Article Feedback
-  saveFeedback(userId: string, articleId: string, feedback: 'thumbs_up' | 'thumbs_down'): Promise<{ success: boolean }>;
+  saveFeedback(
+    userId: string,
+    articleId: string,
+    feedback: "thumbs_up" | "thumbs_down"
+  ): Promise<{ success: boolean }>;
   removeFeedback(userId: string, articleId: string): Promise<{ success: boolean }>;
-  getFeedback(userId: string, articleId: string): Promise<{ feedback: 'thumbs_up' | 'thumbs_down' } | null>;
-  getUserFeedback(userId: string): Promise<Array<{ articleId: string; feedback: 'thumbs_up' | 'thumbs_down'; createdAt: Date }>>;
-  getFeedbackSummaryForArticles(articleIds: string[]): Promise<Map<string, { thumbsUp: number; thumbsDown: number }>>;
-  
+  getFeedback(
+    userId: string,
+    articleId: string
+  ): Promise<{ feedback: "thumbs_up" | "thumbs_down" } | null>;
+  getUserFeedback(
+    userId: string
+  ): Promise<Array<{ articleId: string; feedback: "thumbs_up" | "thumbs_down"; createdAt: Date }>>;
+  getFeedbackSummaryForArticles(
+    articleIds: string[]
+  ): Promise<Map<string, { thumbsUp: number; thumbsDown: number }>>;
+
   // Keywords
   createKeyword(keyword: InsertKeyword): Promise<Keyword>;
   getKeywords(): Promise<Keyword[]>;
   getKeywordsByType(type: string): Promise<Keyword[]>;
   deleteKeyword(id: string): Promise<boolean>;
-  
+
   // Replacement Patterns
   createReplacementPattern(pattern: InsertReplacementPattern): Promise<ReplacementPattern>;
   getReplacementPatterns(userId?: string): Promise<ReplacementPattern[]>;
   deleteReplacementPattern(id: string): Promise<boolean>;
-  
+
   // User Preferences
   getUserPreferences(userId?: string): Promise<UserPreferences | undefined>;
   updateUserPreferences(preferences: Partial<UserPreferences>, userId?: string): Promise<UserPreferences>;
-  
+
   // Podcasts
   createPodcast(podcast: InsertPodcast): Promise<Podcast>;
   getPodcasts(): Promise<Podcast[]>;
@@ -65,7 +91,10 @@ export class MemStorage implements IStorage {
   private userPreferences: UserPreferences | undefined;
   private userLikes: Map<string, Set<string>>; // Map of userId -> Set of articleIds
   private userSavedArticles: Map<string, Set<string>>; // Map of userId -> Set of articleIds
-  private userFeedback: Map<string, Map<string, { feedback: 'thumbs_up' | 'thumbs_down'; createdAt: Date }>>; // Map of userId -> Map of articleId -> feedback
+  private userFeedback: Map<
+    string,
+    Map<string, { feedback: "thumbs_up" | "thumbs_down"; createdAt: Date }>
+  >;
 
   constructor() {
     this.articles = new Map();
@@ -82,8 +111,7 @@ export class MemStorage implements IStorage {
       sentimentThreshold: 0.7,
       realTimeFiltering: true,
     };
-    
-    // Initialize with some default keywords
+
     this.initializeDefaultKeywords();
   }
 
@@ -99,42 +127,42 @@ export class MemStorage implements IStorage {
       { keyword: "success", type: "prioritized" },
     ];
 
-    defaultKeywords.forEach(kw => {
+    defaultKeywords.forEach((kw) => {
       const id = randomUUID();
-      this.keywords.set(id, { id, ...kw });
+      this.keywords.set(id, { id, ...kw } as any);
     });
   }
 
   async createArticle(insertArticle: InsertArticle): Promise<Article> {
     const id = randomUUID();
-    const article: Article = { 
+    const article: Article = {
       ...insertArticle,
       content: insertArticle.content || null,
       keywords: (insertArticle.keywords as string[]) || [],
       id,
       views: 0,
       likes: 0,
-    };
+    } as any;
     this.articles.set(id, article);
     return article;
   }
 
   async getArticles(): Promise<Article[]> {
-    return Array.from(this.articles.values()).sort((a, b) => 
-      new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime()
+    return Array.from(this.articles.values()).sort(
+      (a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime()
     );
   }
 
   async getCuratedArticles(): Promise<Article[]> {
     return Array.from(this.articles.values())
-      .filter(article => article.isCurated)
+      .filter((article) => article.isCurated)
       .sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime())
-      .slice(0, 30); // Limit to 30 curated articles maximum
+      .slice(0, 30);
   }
 
   async getTopFiveArticles(): Promise<Article[]> {
     return Array.from(this.articles.values())
-      .filter(article => article.isTopFive)
+      .filter((article) => article.isTopFive)
       .sort((a, b) => (b.views || 0) - (a.views || 0))
       .slice(0, 5);
   }
@@ -142,52 +170,81 @@ export class MemStorage implements IStorage {
   async updateArticle(id: string, updates: Partial<Article>): Promise<Article | undefined> {
     const article = this.articles.get(id);
     if (!article) return undefined;
-    
     const updatedArticle = { ...article, ...updates };
-    this.articles.set(id, updatedArticle);
-    return updatedArticle;
+    this.articles.set(id, updatedArticle as any);
+    return updatedArticle as any;
   }
 
   async clearAllCurationFlags(): Promise<void> {
     for (const [id, article] of this.articles.entries()) {
       if (article.isCurated || article.isTopFive) {
-        this.articles.set(id, { ...article, isCurated: false, isTopFive: false });
+        this.articles.set(id, { ...article, isCurated: false, isTopFive: false } as any);
       }
     }
   }
 
+  // ✅ NEW: Bulk curation flags (in-memory version)
+  async setCurationFlagsBulk(topFiveIds: string[], curatedIds: string[]): Promise<void> {
+    const topSet = new Set(topFiveIds);
+    const curatedSet = new Set(curatedIds);
+
+    // clear existing flags
+    for (const [id, article] of this.articles.entries()) {
+      if (article.isCurated || article.isTopFive) {
+        this.articles.set(id, { ...article, isCurated: false, isTopFive: false } as any);
+      }
+    }
+
+    // apply top five
+    for (const id of topSet) {
+      const article = this.articles.get(id);
+      if (article) {
+        this.articles.set(id, { ...article, isTopFive: true, isCurated: false } as any);
+      }
+    }
+
+    // apply curated
+    for (const id of curatedSet) {
+      const article = this.articles.get(id);
+      if (article) {
+        this.articles.set(id, { ...article, isCurated: true, isTopFive: false } as any);
+      }
+    }
+  }
+
+  // Article Likes
   async likeArticle(articleId: string, userId: string): Promise<{ success: boolean; likes: number }> {
     const article = this.articles.get(articleId);
     if (!article) return { success: false, likes: 0 };
-    
+
     let userLikeSet = this.userLikes.get(userId);
     if (!userLikeSet) {
       userLikeSet = new Set<string>();
       this.userLikes.set(userId, userLikeSet);
     }
-    
+
     if (userLikeSet.has(articleId)) {
-      return { success: false, likes: article.likes || 0 };
+      return { success: false, likes: (article.likes || 0) as any };
     }
-    
+
     userLikeSet.add(articleId);
-    const newLikes = (article.likes || 0) + 1;
-    await this.updateArticle(articleId, { likes: newLikes });
+    const newLikes = ((article.likes || 0) as number) + 1;
+    await this.updateArticle(articleId, { likes: newLikes } as any);
     return { success: true, likes: newLikes };
   }
 
   async unlikeArticle(articleId: string, userId: string): Promise<{ success: boolean; likes: number }> {
     const article = this.articles.get(articleId);
     if (!article) return { success: false, likes: 0 };
-    
+
     const userLikeSet = this.userLikes.get(userId);
     if (!userLikeSet || !userLikeSet.has(articleId)) {
-      return { success: false, likes: article.likes || 0 };
+      return { success: false, likes: (article.likes || 0) as any };
     }
-    
+
     userLikeSet.delete(articleId);
-    const newLikes = Math.max(0, (article.likes || 0) - 1);
-    await this.updateArticle(articleId, { likes: newLikes });
+    const newLikes = Math.max(0, ((article.likes || 0) as number) - 1);
+    await this.updateArticle(articleId, { likes: newLikes } as any);
     return { success: true, likes: newLikes };
   }
 
@@ -201,20 +258,21 @@ export class MemStorage implements IStorage {
     return userLikeSet ? Array.from(userLikeSet) : [];
   }
 
+  // Saved Articles
   async saveArticle(articleId: string, userId: string): Promise<{ success: boolean }> {
     const article = this.articles.get(articleId);
     if (!article) return { success: false };
-    
+
     let userSavedSet = this.userSavedArticles.get(userId);
     if (!userSavedSet) {
       userSavedSet = new Set<string>();
       this.userSavedArticles.set(userId, userSavedSet);
     }
-    
+
     if (userSavedSet.has(articleId)) {
       return { success: false };
     }
-    
+
     userSavedSet.add(articleId);
     return { success: true };
   }
@@ -224,7 +282,7 @@ export class MemStorage implements IStorage {
     if (!userSavedSet || !userSavedSet.has(articleId)) {
       return { success: false };
     }
-    
+
     userSavedSet.delete(articleId);
     return { success: true };
   }
@@ -237,7 +295,7 @@ export class MemStorage implements IStorage {
   async getSavedArticles(userId: string): Promise<Article[]> {
     const userSavedSet = this.userSavedArticles.get(userId);
     if (!userSavedSet) return [];
-    
+
     const savedArticles: Article[] = [];
     for (const articleId of userSavedSet) {
       const article = this.articles.get(articleId);
@@ -245,22 +303,27 @@ export class MemStorage implements IStorage {
         savedArticles.push(article);
       }
     }
-    
-    return savedArticles.sort((a, b) => 
-      new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime()
+
+    return savedArticles.sort(
+      (a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime()
     );
   }
 
-  async saveFeedback(userId: string, articleId: string, feedback: 'thumbs_up' | 'thumbs_down'): Promise<{ success: boolean }> {
+  // Article Feedback
+  async saveFeedback(
+    userId: string,
+    articleId: string,
+    feedback: "thumbs_up" | "thumbs_down"
+  ): Promise<{ success: boolean }> {
     const article = this.articles.get(articleId);
     if (!article) return { success: false };
-    
+
     let userFeedbackMap = this.userFeedback.get(userId);
     if (!userFeedbackMap) {
       userFeedbackMap = new Map();
       this.userFeedback.set(userId, userFeedbackMap);
     }
-    
+
     userFeedbackMap.set(articleId, { feedback, createdAt: new Date() });
     return { success: true };
   }
@@ -268,57 +331,60 @@ export class MemStorage implements IStorage {
   async removeFeedback(userId: string, articleId: string): Promise<{ success: boolean }> {
     const userFeedbackMap = this.userFeedback.get(userId);
     if (!userFeedbackMap) return { success: false };
-    
     const deleted = userFeedbackMap.delete(articleId);
     return { success: deleted };
   }
 
-  async getFeedback(userId: string, articleId: string): Promise<{ feedback: 'thumbs_up' | 'thumbs_down' } | null> {
+  async getFeedback(
+    userId: string,
+    articleId: string
+  ): Promise<{ feedback: "thumbs_up" | "thumbs_down" } | null> {
     const userFeedbackMap = this.userFeedback.get(userId);
     if (!userFeedbackMap) return null;
-    
     const feedback = userFeedbackMap.get(articleId);
     return feedback ? { feedback: feedback.feedback } : null;
   }
 
-  async getUserFeedback(userId: string): Promise<Array<{ articleId: string; feedback: 'thumbs_up' | 'thumbs_down'; createdAt: Date }>> {
+  async getUserFeedback(
+    userId: string
+  ): Promise<Array<{ articleId: string; feedback: "thumbs_up" | "thumbs_down"; createdAt: Date }>> {
     const userFeedbackMap = this.userFeedback.get(userId);
     if (!userFeedbackMap) return [];
-    
-    const result: Array<{ articleId: string; feedback: 'thumbs_up' | 'thumbs_down'; createdAt: Date }> = [];
+
+    const result: Array<{ articleId: string; feedback: "thumbs_up" | "thumbs_down"; createdAt: Date }> =
+      [];
     for (const [articleId, data] of userFeedbackMap.entries()) {
       result.push({ articleId, feedback: data.feedback, createdAt: data.createdAt });
     }
-    
+
     return result.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
   }
 
-  async getFeedbackSummaryForArticles(articleIds: string[]): Promise<Map<string, { thumbsUp: number; thumbsDown: number }>> {
+  async getFeedbackSummaryForArticles(
+    articleIds: string[]
+  ): Promise<Map<string, { thumbsUp: number; thumbsDown: number }>> {
     const summary = new Map<string, { thumbsUp: number; thumbsDown: number }>();
-    
     for (const articleId of articleIds) {
       summary.set(articleId, { thumbsUp: 0, thumbsDown: 0 });
     }
-    
+
     for (const userFeedbackMap of this.userFeedback.values()) {
       for (const [articleId, data] of userFeedbackMap.entries()) {
         if (articleIds.includes(articleId)) {
           const stats = summary.get(articleId)!;
-          if (data.feedback === 'thumbs_up') {
-            stats.thumbsUp++;
-          } else {
-            stats.thumbsDown++;
-          }
+          if (data.feedback === "thumbs_up") stats.thumbsUp++;
+          if (data.feedback === "thumbs_down") stats.thumbsDown++;
         }
       }
     }
-    
+
     return summary;
   }
 
+  // Keywords
   async createKeyword(insertKeyword: InsertKeyword): Promise<Keyword> {
     const id = randomUUID();
-    const keyword: Keyword = { ...insertKeyword, id };
+    const keyword: Keyword = { ...insertKeyword, id } as any;
     this.keywords.set(id, keyword);
     return keyword;
   }
@@ -328,58 +394,59 @@ export class MemStorage implements IStorage {
   }
 
   async getKeywordsByType(type: string): Promise<Keyword[]> {
-    return Array.from(this.keywords.values()).filter(kw => kw.type === type);
+    return Array.from(this.keywords.values()).filter((kw) => (kw as any).type === type);
   }
 
   async deleteKeyword(id: string): Promise<boolean> {
     return this.keywords.delete(id);
   }
 
+  // Replacement Patterns
   async createReplacementPattern(insertPattern: InsertReplacementPattern): Promise<ReplacementPattern> {
     const id = randomUUID();
-    const pattern: ReplacementPattern = { ...insertPattern, id };
+    const pattern: ReplacementPattern = { ...insertPattern, id } as any;
     this.replacementPatterns.set(id, pattern);
     return pattern;
   }
 
   async getReplacementPatterns(userId?: string): Promise<ReplacementPattern[]> {
-    // Return empty array if no userId - replacements are user-specific only
     if (!userId) return [];
-    return Array.from(this.replacementPatterns.values())
-      .filter(pattern => pattern.userId === userId);
+    return Array.from(this.replacementPatterns.values()).filter((pattern) => (pattern as any).userId === userId);
   }
 
   async deleteReplacementPattern(id: string): Promise<boolean> {
     return this.replacementPatterns.delete(id);
   }
 
+  // User Preferences
   async getUserPreferences(): Promise<UserPreferences | undefined> {
     return this.userPreferences;
   }
 
   async updateUserPreferences(preferences: Partial<UserPreferences>): Promise<UserPreferences> {
     if (this.userPreferences) {
-      this.userPreferences = { ...this.userPreferences, ...preferences };
+      this.userPreferences = { ...this.userPreferences, ...preferences } as any;
     }
     return this.userPreferences!;
   }
 
+  // Podcasts
   async createPodcast(insertPodcast: InsertPodcast): Promise<Podcast> {
     const id = randomUUID();
-    const podcast: Podcast = { 
+    const podcast: Podcast = {
       ...insertPodcast,
       audioUrl: insertPodcast.audioUrl || null,
       articleIds: (insertPodcast.articleIds as string[]) || [],
       id,
-    };
+    } as any;
     this.podcasts.set(id, podcast);
     return podcast;
   }
 
   async getPodcasts(): Promise<Podcast[]> {
-    return Array.from(this.podcasts.values()).sort((a, b) => 
-      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-    ).slice(0, 3); // Limit to 3 most recent podcasts
+    return Array.from(this.podcasts.values())
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .slice(0, 3);
   }
 
   async getPodcast(id: string): Promise<Podcast | undefined> {
@@ -387,48 +454,36 @@ export class MemStorage implements IStorage {
   }
 
   async getPodcastByDate(date: string): Promise<Podcast | undefined> {
-    return Array.from(this.podcasts.values()).find(podcast => 
-      podcast.createdAt.startsWith(date)
-    );
+    return Array.from(this.podcasts.values()).find((podcast) => (podcast as any).createdAt.startsWith(date));
   }
 
   async updatePodcast(id: string, updates: Partial<Podcast>): Promise<Podcast | undefined> {
     const podcast = this.podcasts.get(id);
     if (!podcast) return undefined;
-    
-    const updatedPodcast = { ...podcast, ...updates };
+    const updatedPodcast = { ...podcast, ...updates } as any;
     this.podcasts.set(id, updatedPodcast);
-    return updatedPodcast;
+    return updatedPodcast as any;
   }
 
-  // User operations (mandatory for Replit Auth)
+  // User operations
   async getUser(id: string): Promise<User | undefined> {
     return this.users.get(id);
   }
 
   async upsertUser(userData: UpsertUser): Promise<User> {
     const existingUser = this.users.get(userData.id);
-    
+
     if (existingUser) {
-      const updatedUser = {
-        ...existingUser,
-        ...userData,
-        updatedAt: new Date(),
-      };
+      const updatedUser = { ...existingUser, ...userData, updatedAt: new Date() } as any;
       this.users.set(userData.id, updatedUser);
-      return updatedUser;
+      return updatedUser as any;
     } else {
-      const newUser: User = {
-        ...userData,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
+      const newUser: User = { ...userData, createdAt: new Date(), updatedAt: new Date() } as any;
       this.users.set(userData.id, newUser);
-      return newUser;
+      return newUser as any;
     }
   }
 }
 
 import { DatabaseStorage } from "./databaseStorage";
-
 export const storage = new DatabaseStorage();
