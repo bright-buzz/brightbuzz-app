@@ -14,7 +14,7 @@ import {
 import { randomUUID } from "crypto";
 
 export interface IStorage {
-  // User operations
+  // User operations (mandatory for Replit Auth)
   getUser(id: string): Promise<User | undefined>;
   upsertUser(user: UpsertUser): Promise<User>;
 
@@ -26,7 +26,7 @@ export interface IStorage {
   updateArticle(id: string, updates: Partial<Article>): Promise<Article | undefined>;
   clearAllCurationFlags(): Promise<void>;
 
-  // ✅ NEW: Bulk curation flags (most reliable long-term)
+  // ✅ Step 1: Add bulk curation flags method (long-term stable)
   setCurationFlagsBulk(topFiveIds: string[], curatedIds: string[]): Promise<void>;
 
   // Article Likes
@@ -94,7 +94,7 @@ export class MemStorage implements IStorage {
   private userFeedback: Map<
     string,
     Map<string, { feedback: "thumbs_up" | "thumbs_down"; createdAt: Date }>
-  >;
+  >; // Map of userId -> Map of articleId -> feedback
 
   constructor() {
     this.articles = new Map();
@@ -112,6 +112,7 @@ export class MemStorage implements IStorage {
       realTimeFiltering: true,
     };
 
+    // Initialize with some default keywords
     this.initializeDefaultKeywords();
   }
 
@@ -129,7 +130,7 @@ export class MemStorage implements IStorage {
 
     defaultKeywords.forEach((kw) => {
       const id = randomUUID();
-      this.keywords.set(id, { id, ...kw } as any);
+      this.keywords.set(id, { id, ...kw });
     });
   }
 
@@ -142,7 +143,7 @@ export class MemStorage implements IStorage {
       id,
       views: 0,
       likes: 0,
-    } as any;
+    };
     this.articles.set(id, article);
     return article;
   }
@@ -157,7 +158,7 @@ export class MemStorage implements IStorage {
     return Array.from(this.articles.values())
       .filter((article) => article.isCurated)
       .sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime())
-      .slice(0, 30);
+      .slice(0, 30); // Limit to 30 curated articles maximum
   }
 
   async getTopFiveArticles(): Promise<Article[]> {
@@ -170,49 +171,49 @@ export class MemStorage implements IStorage {
   async updateArticle(id: string, updates: Partial<Article>): Promise<Article | undefined> {
     const article = this.articles.get(id);
     if (!article) return undefined;
+
     const updatedArticle = { ...article, ...updates };
-    this.articles.set(id, updatedArticle as any);
-    return updatedArticle as any;
+    this.articles.set(id, updatedArticle);
+    return updatedArticle;
   }
 
   async clearAllCurationFlags(): Promise<void> {
     for (const [id, article] of this.articles.entries()) {
       if (article.isCurated || article.isTopFive) {
-        this.articles.set(id, { ...article, isCurated: false, isTopFive: false } as any);
+        this.articles.set(id, { ...article, isCurated: false, isTopFive: false });
       }
     }
   }
 
-  // ✅ NEW: Bulk curation flags (in-memory version)
+  // ✅ Step 2: Add bulk curation update (MemStorage version)
   async setCurationFlagsBulk(topFiveIds: string[], curatedIds: string[]): Promise<void> {
     const topSet = new Set(topFiveIds);
     const curatedSet = new Set(curatedIds);
 
-    // clear existing flags
+    // Clear existing flags
     for (const [id, article] of this.articles.entries()) {
       if (article.isCurated || article.isTopFive) {
-        this.articles.set(id, { ...article, isCurated: false, isTopFive: false } as any);
+        this.articles.set(id, { ...article, isCurated: false, isTopFive: false });
       }
     }
 
-    // apply top five
+    // Apply Top Five
     for (const id of topSet) {
       const article = this.articles.get(id);
       if (article) {
-        this.articles.set(id, { ...article, isTopFive: true, isCurated: false } as any);
+        this.articles.set(id, { ...article, isTopFive: true, isCurated: false });
       }
     }
 
-    // apply curated
+    // Apply Curated
     for (const id of curatedSet) {
       const article = this.articles.get(id);
       if (article) {
-        this.articles.set(id, { ...article, isCurated: true, isTopFive: false } as any);
+        this.articles.set(id, { ...article, isCurated: true, isTopFive: false });
       }
     }
   }
 
-  // Article Likes
   async likeArticle(articleId: string, userId: string): Promise<{ success: boolean; likes: number }> {
     const article = this.articles.get(articleId);
     if (!article) return { success: false, likes: 0 };
@@ -224,12 +225,12 @@ export class MemStorage implements IStorage {
     }
 
     if (userLikeSet.has(articleId)) {
-      return { success: false, likes: (article.likes || 0) as any };
+      return { success: false, likes: article.likes || 0 };
     }
 
     userLikeSet.add(articleId);
-    const newLikes = ((article.likes || 0) as number) + 1;
-    await this.updateArticle(articleId, { likes: newLikes } as any);
+    const newLikes = (article.likes || 0) + 1;
+    await this.updateArticle(articleId, { likes: newLikes });
     return { success: true, likes: newLikes };
   }
 
@@ -239,12 +240,12 @@ export class MemStorage implements IStorage {
 
     const userLikeSet = this.userLikes.get(userId);
     if (!userLikeSet || !userLikeSet.has(articleId)) {
-      return { success: false, likes: (article.likes || 0) as any };
+      return { success: false, likes: article.likes || 0 };
     }
 
     userLikeSet.delete(articleId);
-    const newLikes = Math.max(0, ((article.likes || 0) as number) - 1);
-    await this.updateArticle(articleId, { likes: newLikes } as any);
+    const newLikes = Math.max(0, (article.likes || 0) - 1);
+    await this.updateArticle(articleId, { likes: newLikes });
     return { success: true, likes: newLikes };
   }
 
@@ -258,7 +259,6 @@ export class MemStorage implements IStorage {
     return userLikeSet ? Array.from(userLikeSet) : [];
   }
 
-  // Saved Articles
   async saveArticle(articleId: string, userId: string): Promise<{ success: boolean }> {
     const article = this.articles.get(articleId);
     if (!article) return { success: false };
@@ -309,7 +309,6 @@ export class MemStorage implements IStorage {
     );
   }
 
-  // Article Feedback
   async saveFeedback(
     userId: string,
     articleId: string,
@@ -331,6 +330,7 @@ export class MemStorage implements IStorage {
   async removeFeedback(userId: string, articleId: string): Promise<{ success: boolean }> {
     const userFeedbackMap = this.userFeedback.get(userId);
     if (!userFeedbackMap) return { success: false };
+
     const deleted = userFeedbackMap.delete(articleId);
     return { success: deleted };
   }
@@ -341,6 +341,7 @@ export class MemStorage implements IStorage {
   ): Promise<{ feedback: "thumbs_up" | "thumbs_down" } | null> {
     const userFeedbackMap = this.userFeedback.get(userId);
     if (!userFeedbackMap) return null;
+
     const feedback = userFeedbackMap.get(articleId);
     return feedback ? { feedback: feedback.feedback } : null;
   }
@@ -364,6 +365,7 @@ export class MemStorage implements IStorage {
     articleIds: string[]
   ): Promise<Map<string, { thumbsUp: number; thumbsDown: number }>> {
     const summary = new Map<string, { thumbsUp: number; thumbsDown: number }>();
+
     for (const articleId of articleIds) {
       summary.set(articleId, { thumbsUp: 0, thumbsDown: 0 });
     }
@@ -372,8 +374,11 @@ export class MemStorage implements IStorage {
       for (const [articleId, data] of userFeedbackMap.entries()) {
         if (articleIds.includes(articleId)) {
           const stats = summary.get(articleId)!;
-          if (data.feedback === "thumbs_up") stats.thumbsUp++;
-          if (data.feedback === "thumbs_down") stats.thumbsDown++;
+          if (data.feedback === "thumbs_up") {
+            stats.thumbsUp++;
+          } else {
+            stats.thumbsDown++;
+          }
         }
       }
     }
@@ -381,10 +386,9 @@ export class MemStorage implements IStorage {
     return summary;
   }
 
-  // Keywords
   async createKeyword(insertKeyword: InsertKeyword): Promise<Keyword> {
     const id = randomUUID();
-    const keyword: Keyword = { ...insertKeyword, id } as any;
+    const keyword: Keyword = { ...insertKeyword, id };
     this.keywords.set(id, keyword);
     return keyword;
   }
@@ -394,43 +398,40 @@ export class MemStorage implements IStorage {
   }
 
   async getKeywordsByType(type: string): Promise<Keyword[]> {
-    return Array.from(this.keywords.values()).filter((kw) => (kw as any).type === type);
+    return Array.from(this.keywords.values()).filter((kw) => kw.type === type);
   }
 
   async deleteKeyword(id: string): Promise<boolean> {
     return this.keywords.delete(id);
   }
 
-  // Replacement Patterns
   async createReplacementPattern(insertPattern: InsertReplacementPattern): Promise<ReplacementPattern> {
     const id = randomUUID();
-    const pattern: ReplacementPattern = { ...insertPattern, id } as any;
+    const pattern: ReplacementPattern = { ...insertPattern, id };
     this.replacementPatterns.set(id, pattern);
     return pattern;
   }
 
   async getReplacementPatterns(userId?: string): Promise<ReplacementPattern[]> {
     if (!userId) return [];
-    return Array.from(this.replacementPatterns.values()).filter((pattern) => (pattern as any).userId === userId);
+    return Array.from(this.replacementPatterns.values()).filter((pattern) => pattern.userId === userId);
   }
 
   async deleteReplacementPattern(id: string): Promise<boolean> {
     return this.replacementPatterns.delete(id);
   }
 
-  // User Preferences
   async getUserPreferences(): Promise<UserPreferences | undefined> {
     return this.userPreferences;
   }
 
   async updateUserPreferences(preferences: Partial<UserPreferences>): Promise<UserPreferences> {
     if (this.userPreferences) {
-      this.userPreferences = { ...this.userPreferences, ...preferences } as any;
+      this.userPreferences = { ...this.userPreferences, ...preferences };
     }
     return this.userPreferences!;
   }
 
-  // Podcasts
   async createPodcast(insertPodcast: InsertPodcast): Promise<Podcast> {
     const id = randomUUID();
     const podcast: Podcast = {
@@ -438,7 +439,7 @@ export class MemStorage implements IStorage {
       audioUrl: insertPodcast.audioUrl || null,
       articleIds: (insertPodcast.articleIds as string[]) || [],
       id,
-    } as any;
+    };
     this.podcasts.set(id, podcast);
     return podcast;
   }
@@ -454,18 +455,19 @@ export class MemStorage implements IStorage {
   }
 
   async getPodcastByDate(date: string): Promise<Podcast | undefined> {
-    return Array.from(this.podcasts.values()).find((podcast) => (podcast as any).createdAt.startsWith(date));
+    return Array.from(this.podcasts.values()).find((podcast) => podcast.createdAt.startsWith(date));
   }
 
   async updatePodcast(id: string, updates: Partial<Podcast>): Promise<Podcast | undefined> {
     const podcast = this.podcasts.get(id);
     if (!podcast) return undefined;
-    const updatedPodcast = { ...podcast, ...updates } as any;
+
+    const updatedPodcast = { ...podcast, ...updates };
     this.podcasts.set(id, updatedPodcast);
-    return updatedPodcast as any;
+    return updatedPodcast;
   }
 
-  // User operations
+  // User operations (mandatory for Replit Auth)
   async getUser(id: string): Promise<User | undefined> {
     return this.users.get(id);
   }
@@ -474,16 +476,25 @@ export class MemStorage implements IStorage {
     const existingUser = this.users.get(userData.id);
 
     if (existingUser) {
-      const updatedUser = { ...existingUser, ...userData, updatedAt: new Date() } as any;
+      const updatedUser = {
+        ...existingUser,
+        ...userData,
+        updatedAt: new Date(),
+      };
       this.users.set(userData.id, updatedUser);
-      return updatedUser as any;
+      return updatedUser;
     } else {
-      const newUser: User = { ...userData, createdAt: new Date(), updatedAt: new Date() } as any;
+      const newUser: User = {
+        ...userData,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
       this.users.set(userData.id, newUser);
-      return newUser as any;
+      return newUser;
     }
   }
 }
 
 import { DatabaseStorage } from "./databaseStorage";
+
 export const storage = new DatabaseStorage();
