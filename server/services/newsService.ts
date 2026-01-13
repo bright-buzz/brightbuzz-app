@@ -21,10 +21,6 @@ export class NewsService {
   private readonly FETCH_INTERVAL = 15 * 60 * 1000; // 15 minutes
   private rssService: RSSService;
 
-  // ✅ agreed changes
-  private readonly CURATION_DAYS = 3; // only curate last 3 days
-  private readonly CURATION_CAP = 500; // cap articles for scoring/flagging
-
   constructor() {
     this.rssService = new RSSService();
   }
@@ -125,6 +121,7 @@ export class NewsService {
       if (!article.title || !article.summary || !article.content) continue;
 
       try {
+        // Use fallback values if AI analysis fails
         let sentiment = 0.7; // Default neutral-positive sentiment
         let keywords: string[] = [];
         let summary = article.summary;
@@ -152,7 +149,7 @@ export class NewsService {
           console.log(`AI summarization failed for "${article.title}", using original summary`);
         }
 
-        const processedArticle: InsertArticle = {
+        processed.push({
           title: article.title,
           summary,
           content: article.content,
@@ -166,12 +163,9 @@ export class NewsService {
           isCurated: false,
           isTopFive: false,
           publishedAt: article.publishedAt,
-        };
-
-        processed.push(processedArticle);
+        });
       } catch (error) {
         console.error(`Failed to process RSS article: ${article.title}`, error);
-        continue;
       }
     }
 
@@ -214,7 +208,7 @@ export class NewsService {
         const wordCount = article.content.split(" ").length;
         const readTime = Math.ceil(wordCount / 200);
 
-        const processedArticle: InsertArticle = {
+        processed.push({
           title: article.title,
           summary,
           content: article.content,
@@ -228,12 +222,9 @@ export class NewsService {
           isCurated: false,
           isTopFive: false,
           publishedAt: article.publishedAt,
-        };
-
-        processed.push(processedArticle);
+        });
       } catch (error) {
         console.error("Failed to process NewsAPI article:", article.title, error);
-        continue;
       }
     }
 
@@ -256,7 +247,7 @@ export class NewsService {
         const keywords = this.extractBasicKeywords(article.title + " " + article.summary);
         const summary = article.summary;
 
-        const processedArticle: InsertArticle = {
+        processed.push({
           title: article.title,
           summary,
           content: article.content,
@@ -270,13 +261,11 @@ export class NewsService {
           isCurated: false,
           isTopFive: false,
           publishedAt: article.publishedAt,
-        };
+        });
 
-        processed.push(processedArticle);
         console.log(`Processed RSS article: "${article.title}" from ${article.source}`);
       } catch (error) {
         console.error(`Failed to process RSS article: ${article.title}`, error);
-        continue;
       }
     }
 
@@ -286,7 +275,9 @@ export class NewsService {
 
   private extractBasicKeywords(text: string): string[] {
     const commonWords = new Set([
-      "the","a","an","and","or","but","in","on","at","to","for","of","with","by","is","are","was","were","be","been","have","has","had","do","does","did","will","would","could","should","may","might","must","can","this","that","these","those"
+      "the","a","an","and","or","but","in","on","at","to","for","of","with","by",
+      "is","are","was","were","be","been","have","has","had","do","does","did",
+      "will","would","could","should","may","might","must","can","this","that","these","those",
     ]);
 
     return text
@@ -295,19 +286,6 @@ export class NewsService {
       .split(/\s+/)
       .filter((word) => word.length > 3 && !commonWords.has(word))
       .slice(0, 10);
-  }
-
-  private applyReplacementPatterns(text: string, replacementPatterns: any[]): string {
-    let transformedText = text;
-
-    for (const pattern of replacementPatterns) {
-      const escapedFind = pattern.findText.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-      const flags = pattern.caseSensitive ? "g" : "gi";
-      const regex = new RegExp(escapedFind, flags);
-      transformedText = transformedText.replace(regex, pattern.replaceText);
-    }
-
-    return transformedText;
   }
 
   private categorizeArticle(keywords: string[]): string {
@@ -331,6 +309,7 @@ export class NewsService {
   private async runCurationWithFallback(): Promise<void> {
     try {
       const articles = await storage.getArticles();
+
       console.log("Using basic curation due to AI quota limits");
       await this.runBasicCuration(articles);
     } catch (error) {
@@ -342,57 +321,47 @@ export class NewsService {
     try {
       console.log(`Starting basic curation with ${articles.length} articles`);
 
-      // ✅ still safe to clear, but the BIG win is we no longer do 20 per-row updates afterwards
-      console.log("Clearing all old curation flags...");
-      await storage.clearAllCurationFlags();
-      console.log("Curation flags cleared");
+      // ✅ Step 1: Only curate from last 3 days
+      const days = 3;
+      const threeDaysAgo = Date.now() - days * 24 * 60 * 60 * 1000;
 
-      // ✅ Step 1: only last 3 days
-      const daysAgoMs = this.CURATION_DAYS * 24 * 60 * 60 * 1000;
-      const cutoff = Date.now() - daysAgoMs;
-
-      let recentArticles = articles.filter((article: any) => {
+      const recentArticles = articles.filter((article: any) => {
         const publishedDate = new Date(article.publishedAt).getTime();
-        return publishedDate >= cutoff;
+        return Number.isFinite(publishedDate) && publishedDate >= threeDaysAgo;
       });
 
-      console.log(
-        `After date filtering (last ${this.CURATION_DAYS} days): ${recentArticles.length} of ${articles.length} articles remain`
-      );
-
-      // ✅ Step 1b: cap to 500 (most recent first)
-      recentArticles = recentArticles
-        .sort((a: any, b: any) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime())
-        .slice(0, this.CURATION_CAP);
-
-      console.log(`After cap (${this.CURATION_CAP}): ${recentArticles.length} articles remain`);
+      console.log(`After date filtering (last ${days} days): ${recentArticles.length} of ${articles.length} remain`);
 
       // Filter out blocked keywords
       const blockedKeywords = await storage.getKeywords();
       const blockedTerms = blockedKeywords
         .filter((k: any) => k.type === "blocked")
-        .map((k: any) => k.keyword.toLowerCase());
+        .map((k: any) => (k.keyword || "").toLowerCase())
+        .filter(Boolean);
 
-      const filteredArticles = recentArticles.filter((article: any) => {
-        const articleText = `${article.title} ${article.summary}`.toLowerCase();
+      const keywordFiltered = recentArticles.filter((article: any) => {
+        const articleText = `${article.title ?? ""} ${article.summary ?? ""}`.toLowerCase();
         return !blockedTerms.some((term: string) => articleText.includes(term));
       });
 
-      console.log(`After keyword filtering: ${filteredArticles.length} articles remain`);
+      console.log(`After keyword filtering: ${keywordFiltered.length} articles remain`);
 
       // Deduplicate
-      const deduplicatedArticles = deduplicateArticles(filteredArticles);
-      console.log(
-        `After deduplication: ${deduplicatedArticles.length} unique articles (removed ${
-          filteredArticles.length - deduplicatedArticles.length
-        } duplicates)`
-      );
+      const deduped = deduplicateArticles(keywordFiltered);
+      console.log(`After deduplication: ${deduped.length} unique articles (removed ${keywordFiltered.length - deduped.length})`);
+
+      // ✅ Step 2: Cap curation workload at 500 (choose most recent 500)
+      const capped = deduped
+        .slice()
+        .sort((a: any, b: any) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime())
+        .slice(0, 500);
+
+      console.log(`After capping: ${capped.length} articles will be scored/selected`);
 
       // Score
-      const scoredArticles = deduplicatedArticles.map((article: any) => {
+      const scored = capped.map((article: any) => {
         let score = article.sentiment || 0.7;
-
-        const titleAndSummary = `${article.title} ${article.summary}`.toLowerCase();
+        const titleAndSummary = `${article.title ?? ""} ${article.summary ?? ""}`.toLowerCase();
 
         const positiveTerms = [
           "growth","innovation","success","breakthrough","launch","funding","profit","advance",
@@ -401,9 +370,7 @@ export class NewsService {
         const positiveMatches = positiveTerms.filter((term) => titleAndSummary.includes(term)).length;
         score += positiveMatches * 0.1;
 
-        if (article.category === "Technology" || article.category === "Business") {
-          score += 0.2;
-        }
+        if (article.category === "Technology" || article.category === "Business") score += 0.2;
 
         const hoursOld = (Date.now() - new Date(article.publishedAt).getTime()) / (1000 * 60 * 60);
         if (hoursOld < 24) score += 0.1;
@@ -411,24 +378,18 @@ export class NewsService {
         return { ...article, score };
       });
 
-      const sortedArticles = scoredArticles.sort((a: any, b: any) => b.score - a.score);
+      const sorted = scored.sort((a: any, b: any) => b.score - a.score);
 
-      // Select IDs
-      const topFiveCount = Math.min(5, sortedArticles.length);
-      const curatedStart = topFiveCount;
-      const curatedEnd = Math.min(20, sortedArticles.length);
+      // Pick Top Five + Curated
+      const topFiveIds = sorted.slice(0, 5).map((a: any) => a.id).filter(Boolean);
+      const curatedIds = sorted.slice(5, 20).map((a: any) => a.id).filter(Boolean);
 
-      const topFiveIds = sortedArticles.slice(0, topFiveCount).map((a: any) => a.id);
-      const curatedIds = sortedArticles.slice(curatedStart, curatedEnd).map((a: any) => a.id);
-
-      // ✅ Step 2: bulk DB update (most reliable long-term)
+      // ✅ BULK DB UPDATE (most important reliability fix)
+      console.log("Applying curation flags in bulk (transactional)...");
       await storage.setCurationFlagsBulk(topFiveIds, curatedIds);
+      console.log(`Curation flags applied: ${topFiveIds.length} top five, ${curatedIds.length} curated`);
 
-      const curatedCount = curatedEnd - curatedStart;
-      console.log(
-        `Basic curation complete: ${topFiveCount} top five (exclusive), ${curatedCount} curated (exclusive), no overlap`
-      );
-      console.log(`Top article: "${sortedArticles[0]?.title}" (score: ${sortedArticles[0]?.score})`);
+      console.log(`Top article: "${sorted[0]?.title}" (score: ${sorted[0]?.score})`);
     } catch (error) {
       console.error("Failed to run basic curation:", error);
     }
@@ -436,10 +397,11 @@ export class NewsService {
 
   async filterArticles(articles: any[], blockedKeywords: string[], sentimentThreshold: number) {
     return articles.filter((article) => {
-      const hasBlockedKeyword = blockedKeywords.some((blocked) =>
-        article.title.toLowerCase().includes(blocked.toLowerCase()) ||
-        article.summary.toLowerCase().includes(blocked.toLowerCase()) ||
-        article.keywords.some((kw: string) => kw.toLowerCase().includes(blocked.toLowerCase()))
+      const hasBlockedKeyword = blockedKeywords.some(
+        (blocked) =>
+          article.title.toLowerCase().includes(blocked.toLowerCase()) ||
+          article.summary.toLowerCase().includes(blocked.toLowerCase()) ||
+          article.keywords.some((kw: string) => kw.toLowerCase().includes(blocked.toLowerCase()))
       );
 
       const meetsSentimentThreshold = article.sentiment >= sentimentThreshold;
