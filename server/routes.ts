@@ -103,7 +103,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ======================
-  // KEYWORDS (PUBLIC)
+  // KEYWORDS (PUBLIC + PROTECTED)
   // ======================
   app.get("/api/keywords", async (_req, res) => {
     res.json(await storage.getKeywords());
@@ -113,9 +113,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(await storage.getKeywordsByType(req.params.type));
   });
 
-  app.post("/api/keywords", async (req, res) => {
-    const keyword = await storage.createKeyword(insertKeywordSchema.parse(req.body));
-    res.json(keyword);
+  app.post("/api/keywords", requireAuth(), async (req: any, res) => {
+    try {
+      const keyword = await storage.createKeyword(
+        insertKeywordSchema.parse({
+          ...req.body,
+          userId: req.auth.userId,
+        })
+      );
+      res.json(keyword);
+    } catch (error) {
+      console.error("Error creating keyword:", error);
+      res.status(500).json({ message: "Failed to create keyword" });
+    }
+  });
+
+  app.delete("/api/keywords/:id", requireAuth(), async (req: any, res) => {
+    try {
+      const userId = req.auth.userId;
+      const keywordId = req.params.id;
+
+      const result = await storage.deleteKeyword(keywordId, userId);
+      
+      if (!result) {
+        return res.status(404).json({ message: "Keyword not found" });
+      }
+
+      res.json({ success: true, id: keywordId });
+    } catch (error) {
+      console.error("Error deleting keyword:", error);
+      res.status(500).json({ message: "Failed to delete keyword" });
+    }
   });
 
   // ======================
@@ -137,6 +165,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(pattern);
   });
 
+  app.delete("/api/replacement-patterns/:id", requireAuth(), async (req: any, res) => {
+    try {
+      const userId = req.auth.userId;
+      const patternId = req.params.id;
+
+      const result = await storage.deleteReplacementPattern(patternId, userId);
+      
+      if (!result) {
+        return res.status(404).json({ message: "Replacement pattern not found" });
+      }
+
+      res.json({ success: true, id: patternId });
+    } catch (error) {
+      console.error("Error deleting replacement pattern:", error);
+      res.status(500).json({ message: "Failed to delete replacement pattern" });
+    }
+  });
+
   // ======================
   // PREFERENCES
   // ======================
@@ -148,6 +194,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put("/api/preferences", async (req: any, res) => {
     const { userId } = getAuth(req);
     res.json(await storage.updateUserPreferences(req.body, userId || undefined));
+  });
+
+  // ======================
+  // FILTER PREVIEW
+  // ======================
+  app.get("/api/filter-preview", async (req: any, res) => {
+    try {
+      const { userId } = getAuth(req);
+      const articles = await storage.getCuratedArticles();
+      const filtered = await applyFilters(articles, userId || undefined);
+
+      res.json({
+        beforeCount: articles.length,
+        afterCount: filtered.length,
+        before: articles,
+        after: filtered,
+      });
+    } catch (error) {
+      console.error("Error generating filter preview:", error);
+      res.status(500).json({ message: "Failed to generate filter preview" });
+    }
   });
 
   // ======================
