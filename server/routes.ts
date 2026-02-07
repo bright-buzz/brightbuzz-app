@@ -2,7 +2,10 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { podcastService } from "./services/podcastService";
-import { insertKeywordSchema, insertReplacementPatternSchema } from "@shared/schema";
+import {
+  insertKeywordSchema,
+  insertReplacementPatternSchema,
+} from "@shared/schema";
 import type { FilterPreview } from "@shared/schema";
 import { applyFilters } from "./services/filteringService";
 
@@ -15,7 +18,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Debug route to verify this file is deployed
   app.get("/api/__debug/routes-proof", (_req, res) => {
-    res.json({ ok: true, from: "server/routes.ts", time: new Date().toISOString() });
+    res.json({
+      ok: true,
+      from: "server/routes.ts",
+      time: new Date().toISOString(),
+    });
+  });
+
+  // Optional: prove DELETE routing works at all
+  app.delete("/api/__debug/delete-proof", (_req, res) => {
+    res.json({ ok: true, delete: "works", time: new Date().toISOString() });
   });
 
   // ======================
@@ -85,20 +97,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(result);
   });
 
-  app.post("/api/articles/:id/unlike", requireAuth(), async (req: any, res) => {
-    const result = await storage.unlikeArticle(req.params.id, req.auth.userId);
-    res.json(result);
-  });
+  app.post(
+    "/api/articles/:id/unlike",
+    requireAuth(),
+    async (req: any, res) => {
+      const result = await storage.unlikeArticle(req.params.id, req.auth.userId);
+      res.json(result);
+    }
+  );
 
   app.post("/api/articles/:id/save", requireAuth(), async (req: any, res) => {
     const result = await storage.saveArticle(req.params.id, req.auth.userId);
     res.json(result);
   });
 
-  app.post("/api/articles/:id/unsave", requireAuth(), async (req: any, res) => {
-    const result = await storage.unsaveArticle(req.params.id, req.auth.userId);
-    res.json(result);
-  });
+  app.post(
+    "/api/articles/:id/unsave",
+    requireAuth(),
+    async (req: any, res) => {
+      const result = await storage.unsaveArticle(req.params.id, req.auth.userId);
+      res.json(result);
+    }
+  );
 
   app.get("/api/saved-articles", requireAuth(), async (req: any, res) => {
     const articles = await storage.getSavedArticles(req.auth.userId);
@@ -113,6 +133,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(await storage.getKeywords());
   });
 
+  // NOTE: This is used by the UI: /api/keywords/blocked, /api/keywords/prioritized
   app.get("/api/keywords/:type", async (req, res) => {
     res.json(await storage.getKeywordsByType(req.params.type));
   });
@@ -132,20 +153,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // ✅ DELETE BY ID (this must exist for your UI)
+  /**
+   * ✅ DELETE BY ID (primary)
+   * Your UI calls: DELETE /api/keywords/<uuid>
+   */
   app.delete("/api/keywords/:id", requireAuth(), async (req: any, res) => {
     try {
       const keywordId = req.params.id;
+      const ok = await storage.deleteKeyword(keywordId);
 
-      const result = await storage.deleteKeyword(keywordId);
-
-      if (!result) {
+      if (!ok) {
         return res.status(404).json({ message: "Keyword not found" });
       }
 
       res.json({ success: true, id: keywordId });
     } catch (error) {
       console.error("Error deleting keyword:", error);
+      res.status(500).json({ message: "Failed to delete keyword" });
+    }
+  });
+
+  /**
+   * ✅ DELETE ALIAS (backup)
+   * This uses the *same path pattern* as GET /api/keywords/:type
+   * but treats the param as an ID when the method is DELETE.
+   * This removes any ambiguity in environments where param-route registration
+   * behaves unexpectedly.
+   */
+  app.delete("/api/keywords/:type", requireAuth(), async (req: any, res) => {
+    try {
+      const keywordId = req.params.type; // yes: param name is "type", but for DELETE it’s actually the ID
+      const ok = await storage.deleteKeyword(keywordId);
+
+      if (!ok) {
+        return res.status(404).json({ message: "Keyword not found" });
+      }
+
+      res.json({ success: true, id: keywordId });
+    } catch (error) {
+      console.error("Error deleting keyword (alias):", error);
       res.status(500).json({ message: "Failed to delete keyword" });
     }
   });
@@ -169,23 +215,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(pattern);
   });
 
-  // ✅ DELETE BY ID (this must exist for your UI)
-  app.delete("/api/replacement-patterns/:id", requireAuth(), async (req: any, res) => {
-    try {
-      const patternId = req.params.id;
+  // ✅ DELETE BY ID
+  app.delete(
+    "/api/replacement-patterns/:id",
+    requireAuth(),
+    async (req: any, res) => {
+      try {
+        const patternId = req.params.id;
+        const ok = await storage.deleteReplacementPattern(patternId);
 
-      const result = await storage.deleteReplacementPattern(patternId);
+        if (!ok) {
+          return res.status(404).json({ message: "Replacement pattern not found" });
+        }
 
-      if (!result) {
-        return res.status(404).json({ message: "Replacement pattern not found" });
+        res.json({ success: true, id: patternId });
+      } catch (error) {
+        console.error("Error deleting replacement pattern:", error);
+        res.status(500).json({ message: "Failed to delete replacement pattern" });
       }
-
-      res.json({ success: true, id: patternId });
-    } catch (error) {
-      console.error("Error deleting replacement pattern:", error);
-      res.status(500).json({ message: "Failed to delete replacement pattern" });
     }
-  });
+  );
 
   // ======================
   // PREFERENCES
