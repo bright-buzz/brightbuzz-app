@@ -17,29 +17,28 @@ app.use(
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
+// ✅ Request logger (API only)
 app.use((req, res, next) => {
   const start = Date.now();
   const path = req.path;
-  let capturedJsonResponse: Record<string, any> | undefined = undefined;
+  let capturedJsonResponse: Record<string, any> | undefined;
 
-  const originalResJson = res.json;
-  res.json = function (bodyJson, ...args) {
+  const originalResJson = res.json.bind(res);
+  res.json = function (bodyJson: any) {
     capturedJsonResponse = bodyJson;
-    return originalResJson.apply(res, [bodyJson, ...args]);
+    return originalResJson(bodyJson);
   };
 
   res.on("finish", () => {
-    const duration = Date.now() - start;
     if (path.startsWith("/api")) {
+      const duration = Date.now() - start;
       let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
       if (capturedJsonResponse) {
         logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
       }
-
-      if (logLine.length > 80) {
-        logLine = logLine.slice(0, 79) + "…";
+      if (logLine.length > 100) {
+        logLine = logLine.slice(0, 99) + "…";
       }
-
       log(logLine);
     }
   });
@@ -51,8 +50,6 @@ app.use((req, res, next) => {
  * IMPORTANT:
  * This endpoint is called by the frontend (Home page) using:
  *   apiRequest('POST', '/api/fetch-news', { force: true })
- *
- * It triggers a server-side refresh of the news pipeline.
  */
 app.post("/api/fetch-news", async (req, res) => {
   try {
@@ -66,29 +63,32 @@ app.post("/api/fetch-news", async (req, res) => {
 });
 
 (async () => {
+  // ✅ REGISTER ALL API ROUTES FIRST
   const server = await registerRoutes(app);
 
-  app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-    const status = err.status || err.statusCode || 500;
-    const message = err.message || "Internal Server Error";
-
-    res.status(status).json({ message });
-    throw err;
-  });
-
-  // importantly only setup vite in development and after
-  // setting up all the other routes so the catch-all route
-  // doesn't interfere with the other routes
+  // ✅ Vite ONLY in development (after routes)
   if (app.get("env") === "development") {
     const { setupVite } = await import("./vite");
     await setupVite(app, server);
   }
 
-  // In production, the frontend is served by Vercel, not this backend
-  // ALWAYS serve the app on the port specified in the environment variable PORT
-  // Other ports are firewalled. Default to 5000 if not specified.
-  // this serves both the API and the client.
-  // It is the only port that is not firewalled.
+  // ✅ Production JSON 404 (NO HTML, NO SPA FALLBACK)
+  app.use((req, res) => {
+    res.status(404).json({
+      message: "Not Found",
+      method: req.method,
+      path: req.path,
+    });
+  });
+
+  // ✅ Error handler LAST
+  app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+    console.error(err);
+    const status = err.status || err.statusCode || 500;
+    const message = err.message || "Internal Server Error";
+    res.status(status).json({ message });
+  });
+
   const port = parseInt(process.env.PORT || "5000", 10);
   server.listen(
     {
