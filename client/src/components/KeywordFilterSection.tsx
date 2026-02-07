@@ -5,100 +5,172 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
-import { Filter, ShieldCheck, Ban, Check, Smile, Plus, Frown, Eye, RefreshCw } from "lucide-react";
+import {
+  Filter,
+  ShieldCheck,
+  Ban,
+  Check,
+  Smile,
+  Plus,
+  Frown,
+  Eye,
+  RefreshCw,
+} from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import type { Keyword, UserPreferences, FilterPreview, ReplacementPattern } from "@shared/schema";
+import type {
+  Keyword,
+  UserPreferences,
+  FilterPreview,
+  ReplacementPattern,
+} from "@shared/schema";
+import { useAuth } from "@clerk/clerk-react";
 
 export function KeywordFilterSection() {
   const [newBlockedKeyword, setNewBlockedKeyword] = useState("");
   const [newPrioritizedKeyword, setNewPrioritizedKeyword] = useState("");
   const [newReplacementFind, setNewReplacementFind] = useState("");
   const [newReplacementReplace, setNewReplacementReplace] = useState("");
-  const [newReplacementCaseSensitive, setNewReplacementCaseSensitive] = useState(false);
+  const [newReplacementCaseSensitive, setNewReplacementCaseSensitive] =
+    useState(false);
+
   const { toast } = useToast();
+  const { getToken } = useAuth();
+
+  // If you have VITE_API_URL set, we’ll use it. Otherwise we’ll hit same-origin (/api/...)
+  const API_BASE =
+    (import.meta as any)?.env?.VITE_API_URL?.replace(/\/$/, "") || "";
 
   const { data: blockedKeywords = [] } = useQuery<Keyword[]>({
-    queryKey: ['/api/keywords/blocked'],
+    queryKey: ["/api/keywords/blocked"],
   });
 
   const { data: prioritizedKeywords = [] } = useQuery<Keyword[]>({
-    queryKey: ['/api/keywords/prioritized'],
+    queryKey: ["/api/keywords/prioritized"],
   });
 
   const { data: preferences } = useQuery<UserPreferences>({
-    queryKey: ['/api/preferences'],
+    queryKey: ["/api/preferences"],
   });
 
   const { data: replacementPatterns = [] } = useQuery<ReplacementPattern[]>({
-    queryKey: ['/api/replacement-patterns'],
+    queryKey: ["/api/replacement-patterns"],
   });
 
   const { data: filterPreview } = useQuery<FilterPreview>({
-    queryKey: ['/api/filter-preview'],
+    queryKey: ["/api/filter-preview"],
     enabled: !!preferences,
   });
 
   const addKeywordMutation = useMutation({
     mutationFn: (data: { keyword: string; type: string }) =>
-      apiRequest('POST', '/api/keywords', data),
+      apiRequest("POST", "/api/keywords", data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/keywords'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/filter-preview'] });
+      queryClient.invalidateQueries({ queryKey: ["/api/keywords"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/filter-preview"] });
       toast({ title: "Keyword added successfully" });
     },
   });
 
   const addReplacementPatternMutation = useMutation({
-    mutationFn: (data: { findText: string; replaceText: string; caseSensitive: boolean }) =>
-      apiRequest('POST', '/api/replacement-patterns', data),
+    mutationFn: (data: {
+      findText: string;
+      replaceText: string;
+      caseSensitive: boolean;
+    }) => apiRequest("POST", "/api/replacement-patterns", data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/replacement-patterns'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/filter-preview'] });
+      queryClient.invalidateQueries({ queryKey: ["/api/replacement-patterns"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/filter-preview"] });
       toast({ title: "Replacement pattern added successfully" });
     },
   });
 
+  // ✅ FIXED: Delete keyword uses fetch() + Clerk token + correct URL
   const deleteKeywordMutation = useMutation({
-    mutationFn: (id: string) =>
-      apiRequest('DELETE', `/api/keywords/${id}`),
+    mutationFn: async (id: string) => {
+      const token = await getToken();
+      const url = `${API_BASE}/api/keywords/${id}` || `/api/keywords/${id}`;
+
+      const res = await fetch(url, {
+        method: "DELETE",
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+
+      if (!res.ok) {
+        const text = await res.text().catch(() => "");
+        throw new Error(
+          `Failed to delete keyword (${res.status}). ${text || ""}`.trim()
+        );
+      }
+
+      return true;
+    },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/keywords/blocked'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/keywords/prioritized'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/filter-preview'] });
+      queryClient.invalidateQueries({ queryKey: ["/api/keywords/blocked"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/keywords/prioritized"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/filter-preview"] });
       toast({ title: "Keyword deleted successfully" });
     },
   });
 
+  // ✅ FIXED: Delete replacement pattern uses fetch() + Clerk token + correct URL
   const deleteReplacementPatternMutation = useMutation({
-    mutationFn: (id: string) =>
-      apiRequest('DELETE', `/api/replacement-patterns/${id}`),
+    mutationFn: async (id: string) => {
+      const token = await getToken();
+      const url =
+        `${API_BASE}/api/replacement-patterns/${id}` ||
+        `/api/replacement-patterns/${id}`;
+
+      const res = await fetch(url, {
+        method: "DELETE",
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+
+      if (!res.ok) {
+        const text = await res.text().catch(() => "");
+        throw new Error(
+          `Failed to delete replacement (${res.status}). ${text || ""}`.trim()
+        );
+      }
+
+      return true;
+    },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/replacement-patterns'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/filter-preview'] });
+      queryClient.invalidateQueries({ queryKey: ["/api/replacement-patterns"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/filter-preview"] });
       toast({ title: "Replacement pattern deleted successfully" });
     },
   });
 
   const updatePreferencesMutation = useMutation({
     mutationFn: (data: Partial<UserPreferences>) =>
-      apiRequest('PUT', '/api/preferences', data),
+      apiRequest("PUT", "/api/preferences", data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/preferences'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/filter-preview'] });
+      queryClient.invalidateQueries({ queryKey: ["/api/preferences"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/filter-preview"] });
     },
   });
 
   const handleAddBlockedKeyword = () => {
     if (newBlockedKeyword.trim()) {
-      addKeywordMutation.mutate({ keyword: newBlockedKeyword.trim(), type: 'blocked' });
+      addKeywordMutation.mutate({
+        keyword: newBlockedKeyword.trim(),
+        type: "blocked",
+      });
       setNewBlockedKeyword("");
     }
   };
 
   const handleAddPrioritizedKeyword = () => {
     if (newPrioritizedKeyword.trim()) {
-      addKeywordMutation.mutate({ keyword: newPrioritizedKeyword.trim(), type: 'prioritized' });
+      addKeywordMutation.mutate({
+        keyword: newPrioritizedKeyword.trim(),
+        type: "prioritized",
+      });
       setNewPrioritizedKeyword("");
     }
   };
@@ -116,7 +188,7 @@ export function KeywordFilterSection() {
       addReplacementPatternMutation.mutate({
         findText: newReplacementFind.trim(),
         replaceText: newReplacementReplace.trim(),
-        caseSensitive: newReplacementCaseSensitive
+        caseSensitive: newReplacementCaseSensitive,
       });
       setNewReplacementFind("");
       setNewReplacementReplace("");
@@ -149,12 +221,14 @@ export function KeywordFilterSection() {
           </div>
         </div>
       </div>
-      
+
       <div className="p-6">
         {/* Filter Controls */}
         <div className="mb-6">
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between mb-4">
-            <h3 className="text-lg font-semibold text-slate-900 mb-2 lg:mb-0">Filter Settings</h3>
+            <h3 className="text-lg font-semibold text-slate-900 mb-2 lg:mb-0">
+              Filter Settings
+            </h3>
             <div className="flex items-center space-x-4">
               <div className="flex items-center space-x-2">
                 <span className="text-sm text-slate-600">Real-time filtering</span>
@@ -166,7 +240,7 @@ export function KeywordFilterSection() {
               </div>
             </div>
           </div>
-          
+
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             {/* Blocked Keywords */}
             <Card className="bg-red-50 border-red-200 p-4">
@@ -176,9 +250,9 @@ export function KeywordFilterSection() {
               </h4>
               <div className="flex flex-wrap gap-2 mb-3">
                 {blockedKeywords.map((keyword) => (
-                  <Badge 
-                    key={keyword.id} 
-                    variant="destructive" 
+                  <Badge
+                    key={keyword.id}
+                    variant="destructive"
                     className="bg-red-100 text-red-800 cursor-pointer hover:bg-red-200 flex items-center gap-1"
                     onClick={() => deleteKeywordMutation.mutate(keyword.id)}
                     data-testid={`badge-blocked-${keyword.keyword}`}
@@ -193,12 +267,12 @@ export function KeywordFilterSection() {
                   placeholder="Add keyword"
                   value={newBlockedKeyword}
                   onChange={(e) => setNewBlockedKeyword(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && handleAddBlockedKeyword()}
+                  onKeyPress={(e) => e.key === "Enter" && handleAddBlockedKeyword()}
                   className="text-xs"
                   data-testid="input-blocked-keyword"
                 />
-                <Button 
-                  size="sm" 
+                <Button
+                  size="sm"
                   variant="destructive"
                   onClick={handleAddBlockedKeyword}
                   data-testid="button-add-blocked-keyword"
@@ -216,9 +290,9 @@ export function KeywordFilterSection() {
               </h4>
               <div className="flex flex-wrap gap-2 mb-3">
                 {prioritizedKeywords.map((keyword) => (
-                  <Badge 
-                    key={keyword.id} 
-                    variant="secondary" 
+                  <Badge
+                    key={keyword.id}
+                    variant="secondary"
                     className="bg-green-100 text-green-800 cursor-pointer hover:bg-green-200 flex items-center gap-1"
                     onClick={() => deleteKeywordMutation.mutate(keyword.id)}
                     data-testid={`badge-prioritized-${keyword.keyword}`}
@@ -233,12 +307,14 @@ export function KeywordFilterSection() {
                   placeholder="Add keyword"
                   value={newPrioritizedKeyword}
                   onChange={(e) => setNewPrioritizedKeyword(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && handleAddPrioritizedKeyword()}
+                  onKeyPress={(e) =>
+                    e.key === "Enter" && handleAddPrioritizedKeyword()
+                  }
                   className="text-xs"
                   data-testid="input-prioritized-keyword"
                 />
-                <Button 
-                  size="sm" 
+                <Button
+                  size="sm"
                   className="bg-green-600 hover:bg-green-700"
                   onClick={handleAddPrioritizedKeyword}
                   data-testid="button-add-prioritized-keyword"
@@ -257,14 +333,17 @@ export function KeywordFilterSection() {
               <div className="space-y-2">
                 <div className="flex items-center justify-between text-xs">
                   <span className="text-slate-600">Minimum positivity</span>
-                  <span className="font-medium text-slate-900" data-testid="text-sentiment-threshold">
+                  <span
+                    className="font-medium text-slate-900"
+                    data-testid="text-sentiment-threshold"
+                  >
                     {Math.round((preferences?.sentimentThreshold || 0.7) * 100)}%
                   </span>
                 </div>
-                <input 
-                  type="range" 
-                  min="0" 
-                  max="100" 
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
                   value={(preferences?.sentimentThreshold || 0.7) * 100}
                   onChange={(e) => handleSentimentChange([parseInt(e.target.value)])}
                   className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer"
@@ -284,15 +363,18 @@ export function KeywordFilterSection() {
               </h4>
               <div className="space-y-2 mb-3">
                 {replacementPatterns.map((pattern) => (
-                  <div 
-                    key={pattern.id} 
+                  <div
+                    key={pattern.id}
                     className="bg-purple-100 text-purple-800 p-2 rounded text-xs cursor-pointer hover:bg-purple-200"
                     onClick={() => handleDeleteReplacementPattern(pattern.id)}
                     data-testid={`replacement-pattern-${pattern.id}`}
                   >
-                    <div className="font-medium">"{pattern.findText}" → "{pattern.replaceText}"</div>
+                    <div className="font-medium">
+                      "{pattern.findText}" → "{pattern.replaceText}"
+                    </div>
                     <div className="text-purple-600 mt-1">
-                      {pattern.caseSensitive ? "Case sensitive" : "Case insensitive"} • Click to remove
+                      {pattern.caseSensitive ? "Case sensitive" : "Case insensitive"} •
+                      Click to remove
                     </div>
                   </div>
                 ))}
@@ -327,10 +409,12 @@ export function KeywordFilterSection() {
                       className="w-3 h-3"
                       data-testid="checkbox-case-sensitive"
                     />
-                    <label htmlFor="case-sensitive" className="text-xs text-purple-700">Case sensitive</label>
+                    <label htmlFor="case-sensitive" className="text-xs text-purple-700">
+                      Case sensitive
+                    </label>
                   </div>
-                  <Button 
-                    size="sm" 
+                  <Button
+                    size="sm"
                     className="bg-purple-600 hover:bg-purple-700"
                     onClick={handleAddReplacementPattern}
                     disabled={!newReplacementFind.trim() || !newReplacementReplace.trim()}
@@ -347,7 +431,7 @@ export function KeywordFilterSection() {
         {/* Before/After Preview */}
         <div className="border-t border-slate-200 pt-6">
           <h3 className="text-lg font-semibold text-slate-900 mb-4">Filter Preview</h3>
-          
+
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Before Filtering */}
             <Card className="bg-slate-50 p-4">
@@ -358,14 +442,17 @@ export function KeywordFilterSection() {
                   {filterPreview?.original?.length || 0} articles
                 </Badge>
               </h4>
-              
+
               <div className="space-y-3">
                 {filterPreview?.original?.slice(0, 3).map((article: any, index: number) => (
                   <Card key={index} className="bg-white p-3 border border-slate-200">
                     <h5 className="text-sm font-medium text-slate-900 mb-1">{article.title}</h5>
                     <p className="text-xs text-slate-600 mb-2 line-clamp-2">{article.summary}</p>
                     <div className="flex items-center text-xs text-slate-500">
-                      <Badge variant={article.sentiment < 0.5 ? "destructive" : "secondary"} className="mr-2">
+                      <Badge
+                        variant={article.sentiment < 0.5 ? "destructive" : "secondary"}
+                        className="mr-2"
+                      >
                         {article.category}
                       </Badge>
                       <span className="flex items-center">
@@ -391,10 +478,13 @@ export function KeywordFilterSection() {
                   {filterPreview?.filtered?.length || 0} articles
                 </Badge>
               </h4>
-              
+
               <div className="space-y-3">
                 {filterPreview?.filtered?.slice(0, 3).map((article: any, index: number) => (
-                  <Card key={index} className="bg-white p-3 border border-green-200 shadow-sm">
+                  <Card
+                    key={index}
+                    className="bg-white p-3 border border-green-200 shadow-sm"
+                  >
                     <h5 className="text-sm font-medium text-slate-900 mb-1">{article.title}</h5>
                     <p className="text-xs text-slate-600 mb-2 line-clamp-2">{article.summary}</p>
                     <div className="flex items-center text-xs text-slate-500">
@@ -411,7 +501,7 @@ export function KeywordFilterSection() {
               </div>
             </Card>
           </div>
-          
+
           {/* Filter Statistics */}
           <Card className="mt-6 bg-slate-50 p-4">
             <h4 className="text-sm font-medium text-slate-700 mb-3">Filter Effectiveness</h4>
