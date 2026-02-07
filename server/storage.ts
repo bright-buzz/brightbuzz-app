@@ -1,500 +1,233 @@
-import {
-  type Article,
-  type InsertArticle,
-  type Keyword,
-  type InsertKeyword,
-  type ReplacementPattern,
-  type InsertReplacementPattern,
-  type UserPreferences,
-  type Podcast,
-  type InsertPodcast,
-  type User,
-  type UpsertUser,
-} from "@shared/schema";
-import { randomUUID } from "crypto";
+import type { Express } from "express";
+import { createServer, type Server } from "http";
+import { storage } from "./storage";
+import { newsService } from "./services/newsService";
+import { podcastService } from "./services/podcastService";
+import { insertKeywordSchema, insertReplacementPatternSchema } from "@shared/schema";
+import type { FilterPreview } from "@shared/schema";
+import { applyFilters } from "./services/filteringService";
 
-export interface IStorage {
-  // User operations (mandatory for Replit Auth)
-  getUser(id: string): Promise<User | undefined>;
-  upsertUser(user: UpsertUser): Promise<User>;
+// Clerk
+import { clerkMiddleware, requireAuth, getAuth } from "@clerk/express";
 
-  // Articles
-  createArticle(article: InsertArticle): Promise<Article>;
-  getArticles(): Promise<Article[]>;
-  getCuratedArticles(): Promise<Article[]>;
-  getTopFiveArticles(): Promise<Article[]>;
-  updateArticle(id: string, updates: Partial<Article>): Promise<Article | undefined>;
-  clearAllCurationFlags(): Promise<void>;
+export async function registerRoutes(app: Express): Promise<Server> {
+  // Clerk middleware (adds req.auth)
+  app.use(clerkMiddleware());
 
-  // ✅ Step 1: Add bulk curation flags method (long-term stable)
-  setCurationFlagsBulk(topFiveIds: string[], curatedIds: string[]): Promise<void>;
+  // ======================
+  // AUTH
+  // ======================
+  app.get("/api/auth/user", requireAuth(), async (req: any, res) => {
+    try {
+      const userId = req.auth.userId;
+      const user = await storage.getUser(userId);
+      res.json(user);
+    } catch (error) {
+      console.error("Error fetching user:", error);
+      res.status(500).json({ message: "Failed to fetch user" });
+    }
+  });
 
-  // Article Likes
-  likeArticle(articleId: string, userId: string): Promise<{ success: boolean; likes: number }>;
-  unlikeArticle(articleId: string, userId: string): Promise<{ success: boolean; likes: number }>;
-  isArticleLikedByUser(articleId: string, userId: string): Promise<boolean>;
-  getUserLikedArticles(userId: string): Promise<string[]>;
+  // ======================
+  // ARTICLES (PUBLIC + OPTIONAL AUTH)
+  // ======================
+  app.get("/api/articles", async (_req, res) => {
+    try {
+      const articles = await storage.getArticles();
+      res.json(articles);
+    } catch {
+      res.status(500).json({ message: "Failed to fetch articles" });
+    }
+  });
 
-  // Saved Articles
-  saveArticle(articleId: string, userId: string): Promise<{ success: boolean }>;
-  unsaveArticle(articleId: string, userId: string): Promise<{ success: boolean }>;
-  isArticleSavedByUser(articleId: string, userId: string): Promise<boolean>;
-  getSavedArticles(userId: string): Promise<Article[]>;
+  app.get("/api/articles/curated", async (req: any, res) => {
+    try {
+      const { userId } = getAuth(req);
+      const articles = await storage.getCuratedArticles();
+      const filtered = await applyFilters(articles, userId || undefined);
+      res.json(filtered);
+    } catch {
+      res.status(500).json({ message: "Failed to fetch curated articles" });
+    }
+  });
 
-  // Article Feedback
-  saveFeedback(
-    userId: string,
-    articleId: string,
-    feedback: "thumbs_up" | "thumbs_down"
-  ): Promise<{ success: boolean }>;
-  removeFeedback(userId: string, articleId: string): Promise<{ success: boolean }>;
-  getFeedback(
-    userId: string,
-    articleId: string
-  ): Promise<{ feedback: "thumbs_up" | "thumbs_down" } | null>;
-  getUserFeedback(
-    userId: string
-  ): Promise<Array<{ articleId: string; feedback: "thumbs_up" | "thumbs_down"; createdAt: Date }>>;
-  getFeedbackSummaryForArticles(
-    articleIds: string[]
-  ): Promise<Map<string, { thumbsUp: number; thumbsDown: number }>>;
+  app.get("/api/articles/filtered", async (req: any, res) => {
+    try {
+      const { userId } = getAuth(req);
+      const articles = await storage.getCuratedArticles();
+      const filtered = await applyFilters(articles, userId || undefined);
+      res.json(filtered);
+    } catch {
+      res.status(500).json({ message: "Failed to fetch filtered articles" });
+    }
+  });
 
-  // Keywords
-  createKeyword(keyword: InsertKeyword): Promise<Keyword>;
-  getKeywords(): Promise<Keyword[]>;
-  getKeywordsByType(type: string): Promise<Keyword[]>;
-  deleteKeyword(id: string): Promise<boolean>;
+  app.get("/api/articles/top-five", async (req: any, res) => {
+    try {
+      const { userId } = getAuth(req);
+      const articles = await storage.getTopFiveArticles();
+      const filtered = await applyFilters(articles, userId || undefined);
+      res.json(filtered);
+    } catch {
+      res.status(500).json({ message: "Failed to fetch top five articles" });
+    }
+  });
 
-  // Replacement Patterns
-  createReplacementPattern(pattern: InsertReplacementPattern): Promise<ReplacementPattern>;
-  getReplacementPatterns(userId?: string): Promise<ReplacementPattern[]>;
-  deleteReplacementPattern(id: string): Promise<boolean>;
+  // ======================
+  // LIKES / SAVED (PROTECTED)
+  // ======================
+  app.post("/api/articles/:id/like", requireAuth(), async (req: any, res) => {
+    const result = await storage.likeArticle(req.params.id, req.auth.userId);
+    res.json(result);
+  });
 
-  // User Preferences
-  getUserPreferences(userId?: string): Promise<UserPreferences | undefined>;
-  updateUserPreferences(preferences: Partial<UserPreferences>, userId?: string): Promise<UserPreferences>;
+  app.post("/api/articles/:id/unlike", requireAuth(), async (req: any, res) => {
+    const result = await storage.unlikeArticle(req.params.id, req.auth.userId);
+    res.json(result);
+  });
 
-  // Podcasts
-  createPodcast(podcast: InsertPodcast): Promise<Podcast>;
-  getPodcasts(): Promise<Podcast[]>;
-  getPodcast(id: string): Promise<Podcast | undefined>;
-  getPodcastByDate(date: string): Promise<Podcast | undefined>;
-  updatePodcast(id: string, updates: Partial<Podcast>): Promise<Podcast | undefined>;
-}
+  app.post("/api/articles/:id/save", requireAuth(), async (req: any, res) => {
+    const result = await storage.saveArticle(req.params.id, req.auth.userId);
+    res.json(result);
+  });
 
-export class MemStorage implements IStorage {
-  private articles: Map<string, Article>;
-  private keywords: Map<string, Keyword>;
-  private replacementPatterns: Map<string, ReplacementPattern>;
-  private podcasts: Map<string, Podcast>;
-  private users: Map<string, User>;
-  private userPreferences: UserPreferences | undefined;
-  private userLikes: Map<string, Set<string>>; // Map of userId -> Set of articleIds
-  private userSavedArticles: Map<string, Set<string>>; // Map of userId -> Set of articleIds
-  private userFeedback: Map<
-    string,
-    Map<string, { feedback: "thumbs_up" | "thumbs_down"; createdAt: Date }>
-  >; // Map of userId -> Map of articleId -> feedback
+  app.post("/api/articles/:id/unsave", requireAuth(), async (req: any, res) => {
+    const result = await storage.unsaveArticle(req.params.id, req.auth.userId);
+    res.json(result);
+  });
 
-  constructor() {
-    this.articles = new Map();
-    this.keywords = new Map();
-    this.replacementPatterns = new Map();
-    this.podcasts = new Map();
-    this.users = new Map();
-    this.userLikes = new Map();
-    this.userSavedArticles = new Map();
-    this.userFeedback = new Map();
-    this.userPreferences = {
-      id: randomUUID(),
-      userId: null,
-      sentimentThreshold: 0.7,
-      realTimeFiltering: true,
-    };
+  app.get("/api/saved-articles", requireAuth(), async (req: any, res) => {
+    const articles = await storage.getSavedArticles(req.auth.userId);
+    const filtered = await applyFilters(articles, req.auth.userId);
+    res.json(filtered);
+  });
 
-    // Initialize with some default keywords
-    this.initializeDefaultKeywords();
-  }
+  // ======================
+  // KEYWORDS (PUBLIC + PROTECTED)
+  // ======================
+  app.get("/api/keywords", async (_req, res) => {
+    res.json(await storage.getKeywords());
+  });
 
-  private initializeDefaultKeywords() {
-    const defaultKeywords = [
-      { keyword: "layoffs", type: "blocked" },
-      { keyword: "recession", type: "blocked" },
-      { keyword: "crisis", type: "blocked" },
-      { keyword: "unemployment", type: "blocked" },
-      { keyword: "innovation", type: "prioritized" },
-      { keyword: "growth", type: "prioritized" },
-      { keyword: "career", type: "prioritized" },
-      { keyword: "success", type: "prioritized" },
-    ];
+  app.get("/api/keywords/:type", async (req, res) => {
+    res.json(await storage.getKeywordsByType(req.params.type));
+  });
 
-    defaultKeywords.forEach((kw) => {
-      const id = randomUUID();
-      this.keywords.set(id, { id, ...kw });
-    });
-  }
+  app.post("/api/keywords", requireAuth(), async (req: any, res) => {
+    try {
+      const keyword = await storage.createKeyword(
+        insertKeywordSchema.parse({
+          ...req.body,
+          userId: req.auth.userId,
+        })
+      );
+      res.json(keyword);
+    } catch (error) {
+      console.error("Error creating keyword:", error);
+      res.status(500).json({ message: "Failed to create keyword" });
+    }
+  });
 
-  async createArticle(insertArticle: InsertArticle): Promise<Article> {
-    const id = randomUUID();
-    const article: Article = {
-      ...insertArticle,
-      content: insertArticle.content || null,
-      keywords: (insertArticle.keywords as string[]) || [],
-      id,
-      views: 0,
-      likes: 0,
-    };
-    this.articles.set(id, article);
-    return article;
-  }
+  app.delete("/api/keywords/:id", requireAuth(), async (req: any, res) => {
+    try {
+      const keywordId = req.params.id;
 
-  async getArticles(): Promise<Article[]> {
-    return Array.from(this.articles.values()).sort(
-      (a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime()
+      const result = await storage.deleteKeyword(keywordId);
+      
+      if (!result) {
+        return res.status(404).json({ message: "Keyword not found" });
+      }
+
+      res.json({ success: true, id: keywordId });
+    } catch (error) {
+      console.error("Error deleting keyword:", error);
+      res.status(500).json({ message: "Failed to delete keyword" });
+    }
+  });
+
+  // ======================
+  // REPLACEMENTS (OPTIONAL AUTH)
+  // ======================
+  app.get("/api/replacement-patterns", async (req: any, res) => {
+    const { userId } = getAuth(req);
+    if (!userId) return res.json([]);
+    res.json(await storage.getReplacementPatterns(userId));
+  });
+
+  app.post("/api/replacement-patterns", requireAuth(), async (req: any, res) => {
+    const pattern = await storage.createReplacementPattern(
+      insertReplacementPatternSchema.parse({
+        ...req.body,
+        userId: req.auth.userId,
+      })
     );
-  }
+    res.json(pattern);
+  });
 
-  async getCuratedArticles(): Promise<Article[]> {
-    return Array.from(this.articles.values())
-      .filter((article) => article.isCurated)
-      .sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime())
-      .slice(0, 30); // Limit to 30 curated articles maximum
-  }
+  app.delete("/api/replacement-patterns/:id", requireAuth(), async (req: any, res) => {
+    try {
+      const patternId = req.params.id;
 
-  async getTopFiveArticles(): Promise<Article[]> {
-    return Array.from(this.articles.values())
-      .filter((article) => article.isTopFive)
-      .sort((a, b) => (b.views || 0) - (a.views || 0))
-      .slice(0, 5);
-  }
-
-  async updateArticle(id: string, updates: Partial<Article>): Promise<Article | undefined> {
-    const article = this.articles.get(id);
-    if (!article) return undefined;
-
-    const updatedArticle = { ...article, ...updates };
-    this.articles.set(id, updatedArticle);
-    return updatedArticle;
-  }
-
-  async clearAllCurationFlags(): Promise<void> {
-    for (const [id, article] of this.articles.entries()) {
-      if (article.isCurated || article.isTopFive) {
-        this.articles.set(id, { ...article, isCurated: false, isTopFive: false });
+      const result = await storage.deleteReplacementPattern(patternId);
+      
+      if (!result) {
+        return res.status(404).json({ message: "Replacement pattern not found" });
       }
+
+      res.json({ success: true, id: patternId });
+    } catch (error) {
+      console.error("Error deleting replacement pattern:", error);
+      res.status(500).json({ message: "Failed to delete replacement pattern" });
     }
-  }
+  });
 
-  // ✅ Step 2: Add bulk curation update (MemStorage version)
-  async setCurationFlagsBulk(topFiveIds: string[], curatedIds: string[]): Promise<void> {
-    const topSet = new Set(topFiveIds);
-    const curatedSet = new Set(curatedIds);
+  // ======================
+  // PREFERENCES
+  // ======================
+  app.get("/api/preferences", async (req: any, res) => {
+    const { userId } = getAuth(req);
+    res.json(await storage.getUserPreferences(userId || undefined));
+  });
 
-    // Clear existing flags
-    for (const [id, article] of this.articles.entries()) {
-      if (article.isCurated || article.isTopFive) {
-        this.articles.set(id, { ...article, isCurated: false, isTopFive: false });
-      }
+  app.put("/api/preferences", async (req: any, res) => {
+    const { userId } = getAuth(req);
+    res.json(await storage.updateUserPreferences(req.body, userId || undefined));
+  });
+
+  // ======================
+  // FILTER PREVIEW
+  // ======================
+  app.get("/api/filter-preview", async (req: any, res) => {
+    try {
+      const { userId } = getAuth(req);
+      const articles = await storage.getCuratedArticles();
+      const filtered = await applyFilters(articles, userId || undefined);
+
+      res.json({
+        beforeCount: articles.length,
+        afterCount: filtered.length,
+        before: articles,
+        after: filtered,
+      });
+    } catch (error) {
+      console.error("Error generating filter preview:", error);
+      res.status(500).json({ message: "Failed to generate filter preview" });
     }
+  });
 
-    // Apply Top Five
-    for (const id of topSet) {
-      const article = this.articles.get(id);
-      if (article) {
-        this.articles.set(id, { ...article, isTopFive: true, isCurated: false });
-      }
-    }
+  // ======================
+  // PODCASTS (SINGLE SOURCE OF TRUTH)
+  // ======================
+  app.get("/api/podcasts", async (_req, res) => {
+    const podcasts = await podcastService.getAllPodcasts();
+    res.json(podcasts);
+  });
 
-    // Apply Curated
-    for (const id of curatedSet) {
-      const article = this.articles.get(id);
-      if (article) {
-        this.articles.set(id, { ...article, isCurated: true, isTopFive: false });
-      }
-    }
-  }
+  app.post("/api/podcasts/generate", async (_req, res) => {
+    const podcastId = await podcastService.generateDailyPodcast();
+    res.json({ success: true, podcastId });
+  });
 
-  async likeArticle(articleId: string, userId: string): Promise<{ success: boolean; likes: number }> {
-    const article = this.articles.get(articleId);
-    if (!article) return { success: false, likes: 0 };
-
-    let userLikeSet = this.userLikes.get(userId);
-    if (!userLikeSet) {
-      userLikeSet = new Set<string>();
-      this.userLikes.set(userId, userLikeSet);
-    }
-
-    if (userLikeSet.has(articleId)) {
-      return { success: false, likes: article.likes || 0 };
-    }
-
-    userLikeSet.add(articleId);
-    const newLikes = (article.likes || 0) + 1;
-    await this.updateArticle(articleId, { likes: newLikes });
-    return { success: true, likes: newLikes };
-  }
-
-  async unlikeArticle(articleId: string, userId: string): Promise<{ success: boolean; likes: number }> {
-    const article = this.articles.get(articleId);
-    if (!article) return { success: false, likes: 0 };
-
-    const userLikeSet = this.userLikes.get(userId);
-    if (!userLikeSet || !userLikeSet.has(articleId)) {
-      return { success: false, likes: article.likes || 0 };
-    }
-
-    userLikeSet.delete(articleId);
-    const newLikes = Math.max(0, (article.likes || 0) - 1);
-    await this.updateArticle(articleId, { likes: newLikes });
-    return { success: true, likes: newLikes };
-  }
-
-  async isArticleLikedByUser(articleId: string, userId: string): Promise<boolean> {
-    const userLikeSet = this.userLikes.get(userId);
-    return userLikeSet ? userLikeSet.has(articleId) : false;
-  }
-
-  async getUserLikedArticles(userId: string): Promise<string[]> {
-    const userLikeSet = this.userLikes.get(userId);
-    return userLikeSet ? Array.from(userLikeSet) : [];
-  }
-
-  async saveArticle(articleId: string, userId: string): Promise<{ success: boolean }> {
-    const article = this.articles.get(articleId);
-    if (!article) return { success: false };
-
-    let userSavedSet = this.userSavedArticles.get(userId);
-    if (!userSavedSet) {
-      userSavedSet = new Set<string>();
-      this.userSavedArticles.set(userId, userSavedSet);
-    }
-
-    if (userSavedSet.has(articleId)) {
-      return { success: false };
-    }
-
-    userSavedSet.add(articleId);
-    return { success: true };
-  }
-
-  async unsaveArticle(articleId: string, userId: string): Promise<{ success: boolean }> {
-    const userSavedSet = this.userSavedArticles.get(userId);
-    if (!userSavedSet || !userSavedSet.has(articleId)) {
-      return { success: false };
-    }
-
-    userSavedSet.delete(articleId);
-    return { success: true };
-  }
-
-  async isArticleSavedByUser(articleId: string, userId: string): Promise<boolean> {
-    const userSavedSet = this.userSavedArticles.get(userId);
-    return userSavedSet ? userSavedSet.has(articleId) : false;
-  }
-
-  async getSavedArticles(userId: string): Promise<Article[]> {
-    const userSavedSet = this.userSavedArticles.get(userId);
-    if (!userSavedSet) return [];
-
-    const savedArticles: Article[] = [];
-    for (const articleId of userSavedSet) {
-      const article = this.articles.get(articleId);
-      if (article) {
-        savedArticles.push(article);
-      }
-    }
-
-    return savedArticles.sort(
-      (a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime()
-    );
-  }
-
-  async saveFeedback(
-    userId: string,
-    articleId: string,
-    feedback: "thumbs_up" | "thumbs_down"
-  ): Promise<{ success: boolean }> {
-    const article = this.articles.get(articleId);
-    if (!article) return { success: false };
-
-    let userFeedbackMap = this.userFeedback.get(userId);
-    if (!userFeedbackMap) {
-      userFeedbackMap = new Map();
-      this.userFeedback.set(userId, userFeedbackMap);
-    }
-
-    userFeedbackMap.set(articleId, { feedback, createdAt: new Date() });
-    return { success: true };
-  }
-
-  async removeFeedback(userId: string, articleId: string): Promise<{ success: boolean }> {
-    const userFeedbackMap = this.userFeedback.get(userId);
-    if (!userFeedbackMap) return { success: false };
-
-    const deleted = userFeedbackMap.delete(articleId);
-    return { success: deleted };
-  }
-
-  async getFeedback(
-    userId: string,
-    articleId: string
-  ): Promise<{ feedback: "thumbs_up" | "thumbs_down" } | null> {
-    const userFeedbackMap = this.userFeedback.get(userId);
-    if (!userFeedbackMap) return null;
-
-    const feedback = userFeedbackMap.get(articleId);
-    return feedback ? { feedback: feedback.feedback } : null;
-  }
-
-  async getUserFeedback(
-    userId: string
-  ): Promise<Array<{ articleId: string; feedback: "thumbs_up" | "thumbs_down"; createdAt: Date }>> {
-    const userFeedbackMap = this.userFeedback.get(userId);
-    if (!userFeedbackMap) return [];
-
-    const result: Array<{ articleId: string; feedback: "thumbs_up" | "thumbs_down"; createdAt: Date }> =
-      [];
-    for (const [articleId, data] of userFeedbackMap.entries()) {
-      result.push({ articleId, feedback: data.feedback, createdAt: data.createdAt });
-    }
-
-    return result.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
-  }
-
-  async getFeedbackSummaryForArticles(
-    articleIds: string[]
-  ): Promise<Map<string, { thumbsUp: number; thumbsDown: number }>> {
-    const summary = new Map<string, { thumbsUp: number; thumbsDown: number }>();
-
-    for (const articleId of articleIds) {
-      summary.set(articleId, { thumbsUp: 0, thumbsDown: 0 });
-    }
-
-    for (const userFeedbackMap of this.userFeedback.values()) {
-      for (const [articleId, data] of userFeedbackMap.entries()) {
-        if (articleIds.includes(articleId)) {
-          const stats = summary.get(articleId)!;
-          if (data.feedback === "thumbs_up") {
-            stats.thumbsUp++;
-          } else {
-            stats.thumbsDown++;
-          }
-        }
-      }
-    }
-
-    return summary;
-  }
-
-  async createKeyword(insertKeyword: InsertKeyword): Promise<Keyword> {
-    const id = randomUUID();
-    const keyword: Keyword = { ...insertKeyword, id };
-    this.keywords.set(id, keyword);
-    return keyword;
-  }
-
-  async getKeywords(): Promise<Keyword[]> {
-    return Array.from(this.keywords.values());
-  }
-
-  async getKeywordsByType(type: string): Promise<Keyword[]> {
-    return Array.from(this.keywords.values()).filter((kw) => kw.type === type);
-  }
-
-  async deleteKeyword(id: string): Promise<boolean> {
-    return this.keywords.delete(id);
-  }
-
-  async createReplacementPattern(insertPattern: InsertReplacementPattern): Promise<ReplacementPattern> {
-    const id = randomUUID();
-    const pattern: ReplacementPattern = { ...insertPattern, id };
-    this.replacementPatterns.set(id, pattern);
-    return pattern;
-  }
-
-  async getReplacementPatterns(userId?: string): Promise<ReplacementPattern[]> {
-    if (!userId) return [];
-    return Array.from(this.replacementPatterns.values()).filter((pattern) => pattern.userId === userId);
-  }
-
-  async deleteReplacementPattern(id: string): Promise<boolean> {
-    return this.replacementPatterns.delete(id);
-  }
-
-  async getUserPreferences(): Promise<UserPreferences | undefined> {
-    return this.userPreferences;
-  }
-
-  async updateUserPreferences(preferences: Partial<UserPreferences>): Promise<UserPreferences> {
-    if (this.userPreferences) {
-      this.userPreferences = { ...this.userPreferences, ...preferences };
-    }
-    return this.userPreferences!;
-  }
-
-  async createPodcast(insertPodcast: InsertPodcast): Promise<Podcast> {
-    const id = randomUUID();
-    const podcast: Podcast = {
-      ...insertPodcast,
-      audioUrl: insertPodcast.audioUrl || null,
-      articleIds: (insertPodcast.articleIds as string[]) || [],
-      id,
-    };
-    this.podcasts.set(id, podcast);
-    return podcast;
-  }
-
-  async getPodcasts(): Promise<Podcast[]> {
-    return Array.from(this.podcasts.values())
-      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-      .slice(0, 3);
-  }
-
-  async getPodcast(id: string): Promise<Podcast | undefined> {
-    return this.podcasts.get(id);
-  }
-
-  async getPodcastByDate(date: string): Promise<Podcast | undefined> {
-    return Array.from(this.podcasts.values()).find((podcast) => podcast.createdAt.startsWith(date));
-  }
-
-  async updatePodcast(id: string, updates: Partial<Podcast>): Promise<Podcast | undefined> {
-    const podcast = this.podcasts.get(id);
-    if (!podcast) return undefined;
-
-    const updatedPodcast = { ...podcast, ...updates };
-    this.podcasts.set(id, updatedPodcast);
-    return updatedPodcast;
-  }
-
-  // User operations (mandatory for Replit Auth)
-  async getUser(id: string): Promise<User | undefined> {
-    return this.users.get(id);
-  }
-
-  async upsertUser(userData: UpsertUser): Promise<User> {
-    const existingUser = this.users.get(userData.id);
-
-    if (existingUser) {
-      const updatedUser = {
-        ...existingUser,
-        ...userData,
-        updatedAt: new Date(),
-      };
-      this.users.set(userData.id, updatedUser);
-      return updatedUser;
-    } else {
-      const newUser: User = {
-        ...userData,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
-      this.users.set(userData.id, newUser);
-      return newUser;
-    }
-  }
+  const httpServer = createServer(app);
+  return httpServer;
 }
-
-import { DatabaseStorage } from "./databaseStorage";
-
-export const storage = new DatabaseStorage();
