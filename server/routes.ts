@@ -1,12 +1,8 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { newsService } from "./services/newsService";
 import { podcastService } from "./services/podcastService";
-import {
-  insertKeywordSchema,
-  insertReplacementPatternSchema,
-} from "@shared/schema";
+import { insertKeywordSchema, insertReplacementPatternSchema } from "@shared/schema";
 import type { FilterPreview } from "@shared/schema";
 import { applyFilters } from "./services/filteringService";
 
@@ -94,14 +90,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(result);
   });
 
-  app.post(
-    "/api/articles/:id/unsave",
-    requireAuth(),
-    async (req: any, res) => {
-      const result = await storage.unsaveArticle(req.params.id, req.auth.userId);
-      res.json(result);
-    }
-  );
+  app.post("/api/articles/:id/unsave", requireAuth(), async (req: any, res) => {
+    const result = await storage.unsaveArticle(req.params.id, req.auth.userId);
+    res.json(result);
+  });
 
   app.get("/api/saved-articles", requireAuth(), async (req: any, res) => {
     const articles = await storage.getSavedArticles(req.auth.userId);
@@ -135,7 +127,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // ✅ FIXED: deleteKeyword only takes (keywordId)
+  // ✅ DELETE BY ID (this must exist for your UI)
   app.delete("/api/keywords/:id", requireAuth(), async (req: any, res) => {
     try {
       const keywordId = req.params.id;
@@ -162,43 +154,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(await storage.getReplacementPatterns(userId));
   });
 
-  app.post(
-    "/api/replacement-patterns",
-    requireAuth(),
-    async (req: any, res) => {
-      const pattern = await storage.createReplacementPattern(
-        insertReplacementPatternSchema.parse({
-          ...req.body,
-          userId: req.auth.userId,
-        })
-      );
-      res.json(pattern);
-    }
-  );
+  app.post("/api/replacement-patterns", requireAuth(), async (req: any, res) => {
+    const pattern = await storage.createReplacementPattern(
+      insertReplacementPatternSchema.parse({
+        ...req.body,
+        userId: req.auth.userId,
+      })
+    );
+    res.json(pattern);
+  });
 
-  // ✅ FIXED: deleteReplacementPattern only takes (patternId)
-  app.delete(
-    "/api/replacement-patterns/:id",
-    requireAuth(),
-    async (req: any, res) => {
-      try {
-        const patternId = req.params.id;
+  // ✅ DELETE BY ID (this must exist for your UI)
+  app.delete("/api/replacement-patterns/:id", requireAuth(), async (req: any, res) => {
+    try {
+      const patternId = req.params.id;
 
-        const result = await storage.deleteReplacementPattern(patternId);
+      const result = await storage.deleteReplacementPattern(patternId);
 
-        if (!result) {
-          return res
-            .status(404)
-            .json({ message: "Replacement pattern not found" });
-        }
-
-        res.json({ success: true, id: patternId });
-      } catch (error) {
-        console.error("Error deleting replacement pattern:", error);
-        res.status(500).json({ message: "Failed to delete replacement pattern" });
+      if (!result) {
+        return res.status(404).json({ message: "Replacement pattern not found" });
       }
+
+      res.json({ success: true, id: patternId });
+    } catch (error) {
+      console.error("Error deleting replacement pattern:", error);
+      res.status(500).json({ message: "Failed to delete replacement pattern" });
     }
-  );
+  });
 
   // ======================
   // PREFERENCES
@@ -235,7 +217,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ======================
-  // PODCASTS (SINGLE SOURCE OF TRUTH)
+  // PODCASTS
   // ======================
   app.get("/api/podcasts", async (_req, res) => {
     const podcasts = await podcastService.getAllPodcasts();
