@@ -1,7 +1,6 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { newsService } from "./services/newsService";
 import { podcastService } from "./services/podcastService";
 import { insertKeywordSchema, insertReplacementPatternSchema } from "@shared/schema";
 import { applyFilters } from "./services/filteringService";
@@ -127,6 +126,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ✅ NEW: DELETE by type + keyword (handles /api/keywords/blocked/:keyword etc.)
+  async function deleteKeywordByTypeAndValue(type: string, keywordRaw: string) {
+    const keyword = decodeURIComponent(keywordRaw).trim().toLowerCase();
+
+    // Try narrow lookup first (type-specific), then fallback to all keywords
+    const byType = await storage.getKeywordsByType(type);
+    const match =
+      byType.find((k: any) => (k.keyword || "").trim().toLowerCase() === keyword) ||
+      (await storage.getKeywords()).find(
+        (k: any) =>
+          (k.type || "").toLowerCase() === type.toLowerCase() &&
+          (k.keyword || "").trim().toLowerCase() === keyword
+      );
+
+    if (!match?.id) return false;
+    return storage.deleteKeyword(match.id);
+  }
+
+  // Explicit type routes (most common frontend patterns)
+  app.delete("/api/keywords/blocked/:keyword", requireAuth(), async (req: any, res) => {
+    try {
+      const ok = await deleteKeywordByTypeAndValue("blocked", req.params.keyword);
+      if (!ok) return res.status(404).json({ message: "Keyword not found" });
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting blocked keyword:", error);
+      res.status(500).json({ message: "Failed to delete keyword" });
+    }
+  });
+
+  app.delete("/api/keywords/prioritized/:keyword", requireAuth(), async (req: any, res) => {
+    try {
+      const ok = await deleteKeywordByTypeAndValue("prioritized", req.params.keyword);
+      if (!ok) return res.status(404).json({ message: "Keyword not found" });
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting prioritized keyword:", error);
+      res.status(500).json({ message: "Failed to delete keyword" });
+    }
+  });
+
+  // Generic fallback: /api/keywords/:type/:keyword
+  app.delete("/api/keywords/:type/:keyword", requireAuth(), async (req: any, res) => {
+    try {
+      const ok = await deleteKeywordByTypeAndValue(req.params.type, req.params.keyword);
+      if (!ok) return res.status(404).json({ message: "Keyword not found" });
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting keyword (type+keyword):", error);
+      res.status(500).json({ message: "Failed to delete keyword" });
+    }
+  });
+
+  // ✅ Existing: DELETE by ID (kept)
   app.delete("/api/keywords/:id", requireAuth(), async (req: any, res) => {
     try {
       const keywordId = req.params.id;
@@ -139,7 +192,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json({ success: true, id: keywordId });
     } catch (error) {
-      console.error("Error deleting keyword:", error);
+      console.error("Error deleting keyword (id):", error);
       res.status(500).json({ message: "Failed to delete keyword" });
     }
   });
