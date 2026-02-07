@@ -13,6 +13,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Clerk middleware (adds req.auth)
   app.use(clerkMiddleware());
 
+  // Debug route to verify this file is deployed
+  app.get("/api/__debug/routes-proof", (_req, res) => {
+    res.json({ ok: true, from: "server/routes.ts", time: new Date().toISOString() });
+  });
+
   // ======================
   // AUTH
   // ======================
