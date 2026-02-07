@@ -4,7 +4,6 @@ import { storage } from "./storage";
 import { newsService } from "./services/newsService";
 import { podcastService } from "./services/podcastService";
 import { insertKeywordSchema, insertReplacementPatternSchema } from "@shared/schema";
-import type { FilterPreview } from "@shared/schema";
 import { applyFilters } from "./services/filteringService";
 
 // Clerk
@@ -130,11 +129,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete("/api/keywords/:id", requireAuth(), async (req: any, res) => {
     try {
-      const userId = req.auth.userId;
       const keywordId = req.params.id;
 
-      const result = await storage.deleteKeyword(keywordId, userId);
-      
+      const result = await storage.deleteKeyword(keywordId);
+
       if (!result) {
         return res.status(404).json({ message: "Keyword not found" });
       }
@@ -167,11 +165,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete("/api/replacement-patterns/:id", requireAuth(), async (req: any, res) => {
     try {
-      const userId = req.auth.userId;
       const patternId = req.params.id;
 
-      const result = await storage.deleteReplacementPattern(patternId, userId);
-      
+      const result = await storage.deleteReplacementPattern(patternId);
+
       if (!result) {
         return res.status(404).json({ message: "Replacement pattern not found" });
       }
