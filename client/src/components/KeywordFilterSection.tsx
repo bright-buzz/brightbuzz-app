@@ -89,13 +89,18 @@ export function KeywordFilterSection() {
   const deleteKeywordMutation = useMutation({
     mutationFn: async (id: string) => {
       const token = await getToken();
-      const url = `${API_BASE}/api/keywords/${id}` || `/api/keywords/${id}`;
+
+      // IMPORTANT: never allow `${API_BASE}/...` when API_BASE is empty (it becomes "/api/...")
+      const url = API_BASE
+        ? `${API_BASE}/api/keywords/${id}`
+        : `/api/keywords/${id}`;
 
       const res = await fetch(url, {
         method: "DELETE",
         headers: {
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
+        credentials: "include",
       });
 
       if (!res.ok) {
@@ -119,15 +124,17 @@ export function KeywordFilterSection() {
   const deleteReplacementPatternMutation = useMutation({
     mutationFn: async (id: string) => {
       const token = await getToken();
-      const url =
-        `${API_BASE}/api/replacement-patterns/${id}` ||
-        `/api/replacement-patterns/${id}`;
+
+      const url = API_BASE
+        ? `${API_BASE}/api/replacement-patterns/${id}`
+        : `/api/replacement-patterns/${id}`;
 
       const res = await fetch(url, {
         method: "DELETE",
         headers: {
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
+        credentials: "include",
       });
 
       if (!res.ok) {
@@ -206,7 +213,9 @@ export function KeywordFilterSection() {
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3">
             <Filter className="text-white text-lg" />
-            <h2 className="text-xl font-bold text-white">Keyword Filter Preview</h2>
+            <h2 className="text-xl font-bold text-white">
+              Keyword Filter Preview
+            </h2>
             <Badge variant="secondary" className="bg-white/20 text-white">
               Real-time
             </Badge>
@@ -231,7 +240,9 @@ export function KeywordFilterSection() {
             </h3>
             <div className="flex items-center space-x-4">
               <div className="flex items-center space-x-2">
-                <span className="text-sm text-slate-600">Real-time filtering</span>
+                <span className="text-sm text-slate-600">
+                  Real-time filtering
+                </span>
                 <Switch
                   checked={preferences?.realTimeFiltering || false}
                   onCheckedChange={handleRealTimeToggle}
@@ -267,7 +278,9 @@ export function KeywordFilterSection() {
                   placeholder="Add keyword"
                   value={newBlockedKeyword}
                   onChange={(e) => setNewBlockedKeyword(e.target.value)}
-                  onKeyPress={(e) => e.key === "Enter" && handleAddBlockedKeyword()}
+                  onKeyPress={(e) =>
+                    e.key === "Enter" && handleAddBlockedKeyword()
+                  }
                   className="text-xs"
                   data-testid="input-blocked-keyword"
                 />
@@ -345,7 +358,9 @@ export function KeywordFilterSection() {
                   min="0"
                   max="100"
                   value={(preferences?.sentimentThreshold || 0.7) * 100}
-                  onChange={(e) => handleSentimentChange([parseInt(e.target.value)])}
+                  onChange={(e) =>
+                    handleSentimentChange([parseInt(e.target.value)])
+                  }
                   className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer"
                   data-testid="slider-sentiment-threshold"
                 />
@@ -373,13 +388,17 @@ export function KeywordFilterSection() {
                       "{pattern.findText}" → "{pattern.replaceText}"
                     </div>
                     <div className="text-purple-600 mt-1">
-                      {pattern.caseSensitive ? "Case sensitive" : "Case insensitive"} •
-                      Click to remove
+                      {pattern.caseSensitive
+                        ? "Case sensitive"
+                        : "Case insensitive"}{" "}
+                      • Click to remove
                     </div>
                   </div>
                 ))}
                 {replacementPatterns.length === 0 && (
-                  <div className="text-xs text-purple-600 italic">No replacements set</div>
+                  <div className="text-xs text-purple-600 italic">
+                    No replacements set
+                  </div>
                 )}
               </div>
               <div className="space-y-2">
@@ -405,11 +424,16 @@ export function KeywordFilterSection() {
                       type="checkbox"
                       id="case-sensitive"
                       checked={newReplacementCaseSensitive}
-                      onChange={(e) => setNewReplacementCaseSensitive(e.target.checked)}
+                      onChange={(e) =>
+                        setNewReplacementCaseSensitive(e.target.checked)
+                      }
                       className="w-3 h-3"
                       data-testid="checkbox-case-sensitive"
                     />
-                    <label htmlFor="case-sensitive" className="text-xs text-purple-700">
+                    <label
+                      htmlFor="case-sensitive"
+                      className="text-xs text-purple-700"
+                    >
                       Case sensitive
                     </label>
                   </div>
@@ -417,7 +441,9 @@ export function KeywordFilterSection() {
                     size="sm"
                     className="bg-purple-600 hover:bg-purple-700"
                     onClick={handleAddReplacementPattern}
-                    disabled={!newReplacementFind.trim() || !newReplacementReplace.trim()}
+                    disabled={
+                      !newReplacementFind.trim() || !newReplacementReplace.trim()
+                    }
                     data-testid="button-add-replacement-pattern"
                   >
                     <Plus className="h-3 w-3" />
@@ -430,7 +456,9 @@ export function KeywordFilterSection() {
 
         {/* Before/After Preview */}
         <div className="border-t border-slate-200 pt-6">
-          <h3 className="text-lg font-semibold text-slate-900 mb-4">Filter Preview</h3>
+          <h3 className="text-lg font-semibold text-slate-900 mb-4">
+            Filter Preview
+          </h3>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Before Filtering */}
@@ -438,34 +466,50 @@ export function KeywordFilterSection() {
               <h4 className="text-sm font-medium text-slate-700 mb-3 flex items-center">
                 <Eye className="mr-2 h-4 w-4" />
                 Before Filtering
-                <Badge variant="secondary" className="ml-auto bg-slate-200 text-slate-700">
+                <Badge
+                  variant="secondary"
+                  className="ml-auto bg-slate-200 text-slate-700"
+                >
                   {filterPreview?.original?.length || 0} articles
                 </Badge>
               </h4>
 
               <div className="space-y-3">
-                {filterPreview?.original?.slice(0, 3).map((article: any, index: number) => (
-                  <Card key={index} className="bg-white p-3 border border-slate-200">
-                    <h5 className="text-sm font-medium text-slate-900 mb-1">{article.title}</h5>
-                    <p className="text-xs text-slate-600 mb-2 line-clamp-2">{article.summary}</p>
-                    <div className="flex items-center text-xs text-slate-500">
-                      <Badge
-                        variant={article.sentiment < 0.5 ? "destructive" : "secondary"}
-                        className="mr-2"
-                      >
-                        {article.category}
-                      </Badge>
-                      <span className="flex items-center">
-                        {article.sentiment < 0.5 ? (
-                          <Frown className="h-3 w-3 text-red-500 mr-1" />
-                        ) : (
-                          <Smile className="h-3 w-3 text-green-500 mr-1" />
-                        )}
-                        {Math.round(article.sentiment * 100)}% positive
-                      </span>
-                    </div>
-                  </Card>
-                ))}
+                {filterPreview?.original
+                  ?.slice(0, 3)
+                  .map((article: any, index: number) => (
+                    <Card
+                      key={index}
+                      className="bg-white p-3 border border-slate-200"
+                    >
+                      <h5 className="text-sm font-medium text-slate-900 mb-1">
+                        {article.title}
+                      </h5>
+                      <p className="text-xs text-slate-600 mb-2 line-clamp-2">
+                        {article.summary}
+                      </p>
+                      <div className="flex items-center text-xs text-slate-500">
+                        <Badge
+                          variant={
+                            article.sentiment < 0.5
+                              ? "destructive"
+                              : "secondary"
+                          }
+                          className="mr-2"
+                        >
+                          {article.category}
+                        </Badge>
+                        <span className="flex items-center">
+                          {article.sentiment < 0.5 ? (
+                            <Frown className="h-3 w-3 text-red-500 mr-1" />
+                          ) : (
+                            <Smile className="h-3 w-3 text-green-500 mr-1" />
+                          )}
+                          {Math.round(article.sentiment * 100)}% positive
+                        </span>
+                      </div>
+                    </Card>
+                  ))}
               </div>
             </Card>
 
@@ -474,58 +518,81 @@ export function KeywordFilterSection() {
               <h4 className="text-sm font-medium text-secondary mb-3 flex items-center">
                 <ShieldCheck className="mr-2 h-4 w-4" />
                 After Filtering
-                <Badge variant="secondary" className="ml-auto bg-secondary text-white">
+                <Badge
+                  variant="secondary"
+                  className="ml-auto bg-secondary text-white"
+                >
                   {filterPreview?.filtered?.length || 0} articles
                 </Badge>
               </h4>
 
               <div className="space-y-3">
-                {filterPreview?.filtered?.slice(0, 3).map((article: any, index: number) => (
-                  <Card
-                    key={index}
-                    className="bg-white p-3 border border-green-200 shadow-sm"
-                  >
-                    <h5 className="text-sm font-medium text-slate-900 mb-1">{article.title}</h5>
-                    <p className="text-xs text-slate-600 mb-2 line-clamp-2">{article.summary}</p>
-                    <div className="flex items-center text-xs text-slate-500">
-                      <Badge className="bg-green-100 text-green-700 mr-2">
-                        {article.category}
-                      </Badge>
-                      <span className="flex items-center">
-                        <Smile className="h-3 w-3 text-green-500 mr-1" />
-                        {Math.round(article.sentiment * 100)}% positive
-                      </span>
-                    </div>
-                  </Card>
-                ))}
+                {filterPreview?.filtered
+                  ?.slice(0, 3)
+                  .map((article: any, index: number) => (
+                    <Card
+                      key={index}
+                      className="bg-white p-3 border border-green-200 shadow-sm"
+                    >
+                      <h5 className="text-sm font-medium text-slate-900 mb-1">
+                        {article.title}
+                      </h5>
+                      <p className="text-xs text-slate-600 mb-2 line-clamp-2">
+                        {article.summary}
+                      </p>
+                      <div className="flex items-center text-xs text-slate-500">
+                        <Badge className="bg-green-100 text-green-700 mr-2">
+                          {article.category}
+                        </Badge>
+                        <span className="flex items-center">
+                          <Smile className="h-3 w-3 text-green-500 mr-1" />
+                          {Math.round(article.sentiment * 100)}% positive
+                        </span>
+                      </div>
+                    </Card>
+                  ))}
               </div>
             </Card>
           </div>
 
           {/* Filter Statistics */}
           <Card className="mt-6 bg-slate-50 p-4">
-            <h4 className="text-sm font-medium text-slate-700 mb-3">Filter Effectiveness</h4>
+            <h4 className="text-sm font-medium text-slate-700 mb-3">
+              Filter Effectiveness
+            </h4>
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-center">
               <Card className="bg-white p-3">
-                <div className="text-2xl font-bold text-accent" data-testid="stat-filtered">
+                <div
+                  className="text-2xl font-bold text-accent"
+                  data-testid="stat-filtered"
+                >
                   {filterPreview?.stats?.filteredCount || 0}
                 </div>
                 <div className="text-xs text-slate-600">Articles Filtered</div>
               </Card>
               <Card className="bg-white p-3">
-                <div className="text-2xl font-bold text-secondary" data-testid="stat-passed">
+                <div
+                  className="text-2xl font-bold text-secondary"
+                  data-testid="stat-passed"
+                >
                   {filterPreview?.stats?.passedCount || 0}
                 </div>
                 <div className="text-xs text-slate-600">Articles Passed</div>
               </Card>
               <Card className="bg-white p-3">
-                <div className="text-2xl font-bold text-primary" data-testid="stat-avg-sentiment">
+                <div
+                  className="text-2xl font-bold text-primary"
+                  data-testid="stat-avg-sentiment"
+                >
                   {Math.round((filterPreview?.stats?.avgSentiment || 0) * 100)}%
                 </div>
                 <div className="text-xs text-slate-600">Avg Sentiment</div>
               </Card>
               <Card className="bg-white p-3">
-                <div className="text-2xl font-bold text-warning" data-testid="stat-anxiety-reduction">
+                <div
+                  className="text-2xl font-bold text-warning"
+                  data-testid="stat-anxiety-reduction"
+                >
                   {filterPreview?.stats?.anxietyReduction || 0}%
                 </div>
                 <div className="text-xs text-slate-600">Anxiety Reduction</div>
