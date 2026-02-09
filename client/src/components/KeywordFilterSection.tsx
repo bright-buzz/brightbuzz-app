@@ -24,7 +24,6 @@ import type {
   FilterPreview,
   ReplacementPattern,
 } from "@shared/schema";
-import { useAuth } from "@clerk/clerk-react";
 
 export function KeywordFilterSection() {
   const [newBlockedKeyword, setNewBlockedKeyword] = useState("");
@@ -35,11 +34,6 @@ export function KeywordFilterSection() {
     useState(false);
 
   const { toast } = useToast();
-  const { getToken } = useAuth();
-
-  // If you have VITE_API_URL set, we’ll use it. Otherwise we’ll hit same-origin (/api/...)
-  const API_BASE =
-    (import.meta as any)?.env?.VITE_API_URL?.replace(/\/$/, "") || "";
 
   const { data: blockedKeywords = [] } = useQuery<Keyword[]>({
     queryKey: ["/api/keywords/blocked"],
@@ -85,33 +79,9 @@ export function KeywordFilterSection() {
     },
   });
 
-  // ✅ FIXED: Delete keyword uses fetch() + Clerk token + correct URL
+  // ✅ Use apiRequest so queryClient.ts handles VITE_API_URL correctly
   const deleteKeywordMutation = useMutation({
-    mutationFn: async (id: string) => {
-      const token = await getToken();
-
-      // IMPORTANT: never allow `${API_BASE}/...` when API_BASE is empty (it becomes "/api/...")
-      const url = API_BASE
-        ? `${API_BASE}/api/keywords/${id}`
-        : `/api/keywords/${id}`;
-
-      const res = await fetch(url, {
-        method: "DELETE",
-        headers: {
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        credentials: "include",
-      });
-
-      if (!res.ok) {
-        const text = await res.text().catch(() => "");
-        throw new Error(
-          `Failed to delete keyword (${res.status}). ${text || ""}`.trim()
-        );
-      }
-
-      return true;
-    },
+    mutationFn: (id: string) => apiRequest("DELETE", `/api/keywords/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/keywords/blocked"] });
       queryClient.invalidateQueries({ queryKey: ["/api/keywords/prioritized"] });
@@ -120,32 +90,9 @@ export function KeywordFilterSection() {
     },
   });
 
-  // ✅ FIXED: Delete replacement pattern uses fetch() + Clerk token + correct URL
   const deleteReplacementPatternMutation = useMutation({
-    mutationFn: async (id: string) => {
-      const token = await getToken();
-
-      const url = API_BASE
-        ? `${API_BASE}/api/replacement-patterns/${id}`
-        : `/api/replacement-patterns/${id}`;
-
-      const res = await fetch(url, {
-        method: "DELETE",
-        headers: {
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        credentials: "include",
-      });
-
-      if (!res.ok) {
-        const text = await res.text().catch(() => "");
-        throw new Error(
-          `Failed to delete replacement (${res.status}). ${text || ""}`.trim()
-        );
-      }
-
-      return true;
-    },
+    mutationFn: (id: string) =>
+      apiRequest("DELETE", `/api/replacement-patterns/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/replacement-patterns"] });
       queryClient.invalidateQueries({ queryKey: ["/api/filter-preview"] });
@@ -401,6 +348,7 @@ export function KeywordFilterSection() {
                   </div>
                 )}
               </div>
+
               <div className="space-y-2">
                 <div className="flex space-x-2">
                   <Input
@@ -452,153 +400,6 @@ export function KeywordFilterSection() {
               </div>
             </Card>
           </div>
-        </div>
-
-        {/* Before/After Preview */}
-        <div className="border-t border-slate-200 pt-6">
-          <h3 className="text-lg font-semibold text-slate-900 mb-4">
-            Filter Preview
-          </h3>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Before Filtering */}
-            <Card className="bg-slate-50 p-4">
-              <h4 className="text-sm font-medium text-slate-700 mb-3 flex items-center">
-                <Eye className="mr-2 h-4 w-4" />
-                Before Filtering
-                <Badge
-                  variant="secondary"
-                  className="ml-auto bg-slate-200 text-slate-700"
-                >
-                  {filterPreview?.original?.length || 0} articles
-                </Badge>
-              </h4>
-
-              <div className="space-y-3">
-                {filterPreview?.original
-                  ?.slice(0, 3)
-                  .map((article: any, index: number) => (
-                    <Card
-                      key={index}
-                      className="bg-white p-3 border border-slate-200"
-                    >
-                      <h5 className="text-sm font-medium text-slate-900 mb-1">
-                        {article.title}
-                      </h5>
-                      <p className="text-xs text-slate-600 mb-2 line-clamp-2">
-                        {article.summary}
-                      </p>
-                      <div className="flex items-center text-xs text-slate-500">
-                        <Badge
-                          variant={
-                            article.sentiment < 0.5
-                              ? "destructive"
-                              : "secondary"
-                          }
-                          className="mr-2"
-                        >
-                          {article.category}
-                        </Badge>
-                        <span className="flex items-center">
-                          {article.sentiment < 0.5 ? (
-                            <Frown className="h-3 w-3 text-red-500 mr-1" />
-                          ) : (
-                            <Smile className="h-3 w-3 text-green-500 mr-1" />
-                          )}
-                          {Math.round(article.sentiment * 100)}% positive
-                        </span>
-                      </div>
-                    </Card>
-                  ))}
-              </div>
-            </Card>
-
-            {/* After Filtering */}
-            <Card className="bg-secondary/10 p-4">
-              <h4 className="text-sm font-medium text-secondary mb-3 flex items-center">
-                <ShieldCheck className="mr-2 h-4 w-4" />
-                After Filtering
-                <Badge
-                  variant="secondary"
-                  className="ml-auto bg-secondary text-white"
-                >
-                  {filterPreview?.filtered?.length || 0} articles
-                </Badge>
-              </h4>
-
-              <div className="space-y-3">
-                {filterPreview?.filtered
-                  ?.slice(0, 3)
-                  .map((article: any, index: number) => (
-                    <Card
-                      key={index}
-                      className="bg-white p-3 border border-green-200 shadow-sm"
-                    >
-                      <h5 className="text-sm font-medium text-slate-900 mb-1">
-                        {article.title}
-                      </h5>
-                      <p className="text-xs text-slate-600 mb-2 line-clamp-2">
-                        {article.summary}
-                      </p>
-                      <div className="flex items-center text-xs text-slate-500">
-                        <Badge className="bg-green-100 text-green-700 mr-2">
-                          {article.category}
-                        </Badge>
-                        <span className="flex items-center">
-                          <Smile className="h-3 w-3 text-green-500 mr-1" />
-                          {Math.round(article.sentiment * 100)}% positive
-                        </span>
-                      </div>
-                    </Card>
-                  ))}
-              </div>
-            </Card>
-          </div>
-
-          {/* Filter Statistics */}
-          <Card className="mt-6 bg-slate-50 p-4">
-            <h4 className="text-sm font-medium text-slate-700 mb-3">
-              Filter Effectiveness
-            </h4>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-center">
-              <Card className="bg-white p-3">
-                <div
-                  className="text-2xl font-bold text-accent"
-                  data-testid="stat-filtered"
-                >
-                  {filterPreview?.stats?.filteredCount || 0}
-                </div>
-                <div className="text-xs text-slate-600">Articles Filtered</div>
-              </Card>
-              <Card className="bg-white p-3">
-                <div
-                  className="text-2xl font-bold text-secondary"
-                  data-testid="stat-passed"
-                >
-                  {filterPreview?.stats?.passedCount || 0}
-                </div>
-                <div className="text-xs text-slate-600">Articles Passed</div>
-              </Card>
-              <Card className="bg-white p-3">
-                <div
-                  className="text-2xl font-bold text-primary"
-                  data-testid="stat-avg-sentiment"
-                >
-                  {Math.round((filterPreview?.stats?.avgSentiment || 0) * 100)}%
-                </div>
-                <div className="text-xs text-slate-600">Avg Sentiment</div>
-              </Card>
-              <Card className="bg-white p-3">
-                <div
-                  className="text-2xl font-bold text-warning"
-                  data-testid="stat-anxiety-reduction"
-                >
-                  {filterPreview?.stats?.anxietyReduction || 0}%
-                </div>
-                <div className="text-xs text-slate-600">Anxiety Reduction</div>
-              </Card>
-            </div>
-          </Card>
         </div>
       </div>
     </section>
