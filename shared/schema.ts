@@ -1,5 +1,16 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, real, boolean, jsonb, timestamp, index, unique } from "drizzle-orm/pg-core";
+import {
+  pgTable,
+  text,
+  varchar,
+  integer,
+  real,
+  boolean,
+  jsonb,
+  timestamp,
+  index,
+  unique,
+} from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -22,11 +33,37 @@ export const articles = pgTable("articles", {
   publishedAt: text("published_at").notNull(),
 });
 
-export const keywords = pgTable("keywords", {
+// User storage table for Replit Auth
+export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  keyword: text("keyword").notNull().unique(),
-  type: text("type").notNull(), // 'blocked', 'prioritized'
+  email: varchar("email").unique(),
+  firstName: varchar("first_name"),
+  lastName: varchar("last_name"),
+  profileImageUrl: varchar("profile_image_url"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
 });
+
+/**
+ * Per-user keywords.
+ * NOTE: uniqueness is per (userId, keyword, type) — not global.
+ */
+export const keywords = pgTable(
+  "keywords",
+  {
+    id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+    keyword: text("keyword").notNull(),
+    type: text("type").notNull(), // 'blocked', 'prioritized'
+    userId: varchar("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+  },
+  (table) => [
+    unique("unique_user_keyword_type").on(table.userId, table.keyword, table.type),
+    index("idx_keywords_user_id").on(table.userId),
+    index("idx_keywords_type").on(table.type),
+  ],
+);
 
 export const replacementPatterns = pgTable("replacement_patterns", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -46,17 +83,6 @@ export const sessions = pgTable(
   },
   (table) => [index("IDX_session_expire").on(table.expire)],
 );
-
-// User storage table for Replit Auth
-export const users = pgTable("users", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  email: varchar("email").unique(),
-  firstName: varchar("first_name"),
-  lastName: varchar("last_name"),
-  profileImageUrl: varchar("profile_image_url"),
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
-});
 
 export const userPreferences = pgTable("user_preferences", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -79,18 +105,22 @@ export const userSavedArticles = pgTable("user_saved_articles", {
   savedAt: timestamp("saved_at").defaultNow(),
 });
 
-export const articleFeedback = pgTable("article_feedback", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  userId: varchar("user_id").notNull().references(() => users.id),
-  articleId: varchar("article_id").notNull().references(() => articles.id),
-  feedback: text("feedback").notNull(), // 'thumbs_up' or 'thumbs_down'
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
-}, (table) => [
-  unique("unique_user_article_feedback").on(table.userId, table.articleId),
-  index("idx_feedback_user_id").on(table.userId),
-  index("idx_feedback_article_id").on(table.articleId),
-]);
+export const articleFeedback = pgTable(
+  "article_feedback",
+  {
+    id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+    userId: varchar("user_id").notNull().references(() => users.id),
+    articleId: varchar("article_id").notNull().references(() => articles.id),
+    feedback: text("feedback").notNull(), // 'thumbs_up' or 'thumbs_down'
+    createdAt: timestamp("created_at").defaultNow(),
+    updatedAt: timestamp("updated_at").defaultNow(),
+  },
+  (table) => [
+    unique("unique_user_article_feedback").on(table.userId, table.articleId),
+    index("idx_feedback_user_id").on(table.userId),
+    index("idx_feedback_article_id").on(table.articleId),
+  ],
+);
 
 export const insertArticleSchema = createInsertSchema(articles).omit({
   id: true,
@@ -100,6 +130,7 @@ export const insertArticleSchema = createInsertSchema(articles).omit({
 
 export const insertKeywordSchema = createInsertSchema(keywords).omit({
   id: true,
+  userId: true,
 });
 
 export const insertReplacementPatternSchema = createInsertSchema(replacementPatterns).omit({
@@ -175,13 +206,15 @@ export const insertUserSavedArticleSchema = createInsertSchema(userSavedArticles
 export type UserSavedArticle = typeof userSavedArticles.$inferSelect;
 export type InsertUserSavedArticle = z.infer<typeof insertUserSavedArticleSchema>;
 
-export const insertArticleFeedbackSchema = createInsertSchema(articleFeedback).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-}).extend({
-  feedback: z.enum(['thumbs_up', 'thumbs_down']),
-});
+export const insertArticleFeedbackSchema = createInsertSchema(articleFeedback)
+  .omit({
+    id: true,
+    createdAt: true,
+    updatedAt: true,
+  })
+  .extend({
+    feedback: z.enum(["thumbs_up", "thumbs_down"]),
+  });
 
 export type ArticleFeedback = typeof articleFeedback.$inferSelect;
 export type InsertArticleFeedback = z.infer<typeof insertArticleFeedbackSchema>;
