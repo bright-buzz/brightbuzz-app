@@ -387,12 +387,19 @@ export class DatabaseStorage implements IStorage {
     return keyword;
   }
 
-  async getKeywords(): Promise<Keyword[]> {
-    return await db.select().from(keywords);
+  async getKeywords(userId?: string): Promise<Keyword[]> {
+    if (!userId) return await db.select().from(keywords);
+    return await db.select().from(keywords).where(eq(keywords.userId, userId));
   }
 
-  async getKeywordsByType(type: string): Promise<Keyword[]> {
-    return await db.select().from(keywords).where(eq(keywords.type, type));
+  async getKeywordsByType(type: string, userId?: string): Promise<Keyword[]> {
+    if (!userId) {
+      return await db.select().from(keywords).where(eq(keywords.type, type));
+    }
+    return await db
+      .select()
+      .from(keywords)
+      .where(and(eq(keywords.type, type), eq(keywords.userId, userId)));
   }
 
   async deleteKeyword(id: string): Promise<boolean> {
