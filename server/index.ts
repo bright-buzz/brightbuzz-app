@@ -9,10 +9,7 @@ const app = express();
 // ✅ CORS: allow Vercel frontend to call this Render backend
 app.use(
   cors({
-    origin: [
-      "https://brightbuzz.vercel.app",
-      "https://getbrightbuzz.com", // add if you’re using custom domain
-    ],
+    origin: ["https://brightbuzz.vercel.app"],
     credentials: true,
     allowedHeaders: ["Content-Type", "Authorization"],
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
