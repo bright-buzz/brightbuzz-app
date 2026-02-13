@@ -23,21 +23,33 @@ export interface IStorage {
   getArticles(): Promise<Article[]>;
   getCuratedArticles(): Promise<Article[]>;
   getTopFiveArticles(): Promise<Article[]>;
-  updateArticle(id: string, updates: Partial<Article>): Promise<Article | undefined>;
+  updateArticle(
+    id: string,
+    updates: Partial<Article>
+  ): Promise<Article | undefined>;
   clearAllCurationFlags(): Promise<void>;
 
   // ✅ Step 1: Add bulk curation flags method (long-term stable)
   setCurationFlagsBulk(topFiveIds: string[], curatedIds: string[]): Promise<void>;
 
   // Article Likes
-  likeArticle(articleId: string, userId: string): Promise<{ success: boolean; likes: number }>;
-  unlikeArticle(articleId: string, userId: string): Promise<{ success: boolean; likes: number }>;
+  likeArticle(
+    articleId: string,
+    userId: string
+  ): Promise<{ success: boolean; likes: number }>;
+  unlikeArticle(
+    articleId: string,
+    userId: string
+  ): Promise<{ success: boolean; likes: number }>;
   isArticleLikedByUser(articleId: string, userId: string): Promise<boolean>;
   getUserLikedArticles(userId: string): Promise<string[]>;
 
   // Saved Articles
   saveArticle(articleId: string, userId: string): Promise<{ success: boolean }>;
-  unsaveArticle(articleId: string, userId: string): Promise<{ success: boolean }>;
+  unsaveArticle(
+    articleId: string,
+    userId: string
+  ): Promise<{ success: boolean }>;
   isArticleSavedByUser(articleId: string, userId: string): Promise<boolean>;
   getSavedArticles(userId: string): Promise<Article[]>;
 
@@ -47,39 +59,52 @@ export interface IStorage {
     articleId: string,
     feedback: "thumbs_up" | "thumbs_down"
   ): Promise<{ success: boolean }>;
-  removeFeedback(userId: string, articleId: string): Promise<{ success: boolean }>;
+  removeFeedback(
+    userId: string,
+    articleId: string
+  ): Promise<{ success: boolean }>;
   getFeedback(
     userId: string,
     articleId: string
   ): Promise<{ feedback: "thumbs_up" | "thumbs_down" } | null>;
   getUserFeedback(
     userId: string
-  ): Promise<Array<{ articleId: string; feedback: "thumbs_up" | "thumbs_down"; createdAt: Date }>>;
+  ): Promise<
+    Array<{ articleId: string; feedback: "thumbs_up" | "thumbs_down"; createdAt: Date }>
+  >;
   getFeedbackSummaryForArticles(
     articleIds: string[]
   ): Promise<Map<string, { thumbsUp: number; thumbsDown: number }>>;
 
   // Keywords
   createKeyword(keyword: InsertKeyword): Promise<Keyword>;
-  getKeywords(): Promise<Keyword[]>;
-  getKeywordsByType(type: string): Promise<Keyword[]>;
+  getKeywords(userId?: string): Promise<Keyword[]>;
+  getKeywordsByType(type: string, userId?: string): Promise<Keyword[]>;
   deleteKeyword(id: string): Promise<boolean>;
 
   // Replacement Patterns
-  createReplacementPattern(pattern: InsertReplacementPattern): Promise<ReplacementPattern>;
+  createReplacementPattern(
+    pattern: InsertReplacementPattern
+  ): Promise<ReplacementPattern>;
   getReplacementPatterns(userId?: string): Promise<ReplacementPattern[]>;
   deleteReplacementPattern(id: string): Promise<boolean>;
 
   // User Preferences
   getUserPreferences(userId?: string): Promise<UserPreferences | undefined>;
-  updateUserPreferences(preferences: Partial<UserPreferences>, userId?: string): Promise<UserPreferences>;
+  updateUserPreferences(
+    preferences: Partial<UserPreferences>,
+    userId?: string
+  ): Promise<UserPreferences>;
 
   // Podcasts
   createPodcast(podcast: InsertPodcast): Promise<Podcast>;
   getPodcasts(): Promise<Podcast[]>;
   getPodcast(id: string): Promise<Podcast | undefined>;
   getPodcastByDate(date: string): Promise<Podcast | undefined>;
-  updatePodcast(id: string, updates: Partial<Podcast>): Promise<Podcast | undefined>;
+  updatePodcast(
+    id: string,
+    updates: Partial<Podcast>
+  ): Promise<Podcast | undefined>;
 }
 
 export class MemStorage implements IStorage {
@@ -107,7 +132,7 @@ export class MemStorage implements IStorage {
     this.userFeedback = new Map();
     this.userPreferences = {
       id: randomUUID(),
-      userId: null,
+      userId: null as any, // MemStorage-only default; real DB version should be per-user
       sentimentThreshold: 0.7,
       realTimeFiltering: true,
     };
@@ -128,9 +153,11 @@ export class MemStorage implements IStorage {
       { keyword: "success", type: "prioritized" },
     ];
 
+    // In MemStorage, we don't have a real auth user, so these are "global".
+    // They will still return when userId is omitted.
     defaultKeywords.forEach((kw) => {
       const id = randomUUID();
-      this.keywords.set(id, { id, ...kw });
+      this.keywords.set(id, { id, ...kw } as any);
     });
   }
 
@@ -234,7 +261,10 @@ export class MemStorage implements IStorage {
     return { success: true, likes: newLikes };
   }
 
-  async unlikeArticle(articleId: string, userId: string): Promise<{ success: boolean; likes: number }> {
+  async unlikeArticle(
+    articleId: string,
+    userId: string
+  ): Promise<{ success: boolean; likes: number }> {
     const article = this.articles.get(articleId);
     if (!article) return { success: false, likes: 0 };
 
@@ -299,9 +329,7 @@ export class MemStorage implements IStorage {
     const savedArticles: Article[] = [];
     for (const articleId of userSavedSet) {
       const article = this.articles.get(articleId);
-      if (article) {
-        savedArticles.push(article);
-      }
+      if (article) savedArticles.push(article);
     }
 
     return savedArticles.sort(
@@ -330,7 +358,6 @@ export class MemStorage implements IStorage {
   async removeFeedback(userId: string, articleId: string): Promise<{ success: boolean }> {
     const userFeedbackMap = this.userFeedback.get(userId);
     if (!userFeedbackMap) return { success: false };
-
     const deleted = userFeedbackMap.delete(articleId);
     return { success: deleted };
   }
@@ -366,19 +393,14 @@ export class MemStorage implements IStorage {
   ): Promise<Map<string, { thumbsUp: number; thumbsDown: number }>> {
     const summary = new Map<string, { thumbsUp: number; thumbsDown: number }>();
 
-    for (const articleId of articleIds) {
-      summary.set(articleId, { thumbsUp: 0, thumbsDown: 0 });
-    }
+    for (const articleId of articleIds) summary.set(articleId, { thumbsUp: 0, thumbsDown: 0 });
 
     for (const userFeedbackMap of this.userFeedback.values()) {
       for (const [articleId, data] of userFeedbackMap.entries()) {
         if (articleIds.includes(articleId)) {
           const stats = summary.get(articleId)!;
-          if (data.feedback === "thumbs_up") {
-            stats.thumbsUp++;
-          } else {
-            stats.thumbsDown++;
-          }
+          if (data.feedback === "thumbs_up") stats.thumbsUp++;
+          else stats.thumbsDown++;
         }
       }
     }
@@ -388,17 +410,21 @@ export class MemStorage implements IStorage {
 
   async createKeyword(insertKeyword: InsertKeyword): Promise<Keyword> {
     const id = randomUUID();
-    const keyword: Keyword = { ...insertKeyword, id };
+    const keyword: Keyword = { ...insertKeyword, id } as any;
     this.keywords.set(id, keyword);
     return keyword;
   }
 
-  async getKeywords(): Promise<Keyword[]> {
-    return Array.from(this.keywords.values());
+  async getKeywords(userId?: string): Promise<Keyword[]> {
+    const all = Array.from(this.keywords.values());
+    if (!userId) return all;
+    return all.filter((kw: any) => kw.userId === userId);
   }
 
-  async getKeywordsByType(type: string): Promise<Keyword[]> {
-    return Array.from(this.keywords.values()).filter((kw) => kw.type === type);
+  async getKeywordsByType(type: string, userId?: string): Promise<Keyword[]> {
+    const all = Array.from(this.keywords.values()).filter((kw) => kw.type === type);
+    if (!userId) return all;
+    return all.filter((kw: any) => kw.userId === userId);
   }
 
   async deleteKeyword(id: string): Promise<boolean> {
@@ -421,11 +447,14 @@ export class MemStorage implements IStorage {
     return this.replacementPatterns.delete(id);
   }
 
-  async getUserPreferences(): Promise<UserPreferences | undefined> {
+  async getUserPreferences(_userId?: string): Promise<UserPreferences | undefined> {
     return this.userPreferences;
   }
 
-  async updateUserPreferences(preferences: Partial<UserPreferences>): Promise<UserPreferences> {
+  async updateUserPreferences(
+    preferences: Partial<UserPreferences>,
+    _userId?: string
+  ): Promise<UserPreferences> {
     if (this.userPreferences) {
       this.userPreferences = { ...this.userPreferences, ...preferences };
     }
