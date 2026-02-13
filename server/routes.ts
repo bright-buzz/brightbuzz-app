@@ -97,28 +97,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(result);
   });
 
-  app.post(
-    "/api/articles/:id/unlike",
-    requireAuth(),
-    async (req: any, res) => {
-      const result = await storage.unlikeArticle(req.params.id, req.auth.userId);
-      res.json(result);
-    }
-  );
+  app.post("/api/articles/:id/unlike", requireAuth(), async (req: any, res) => {
+    const result = await storage.unlikeArticle(req.params.id, req.auth.userId);
+    res.json(result);
+  });
 
   app.post("/api/articles/:id/save", requireAuth(), async (req: any, res) => {
     const result = await storage.saveArticle(req.params.id, req.auth.userId);
     res.json(result);
   });
 
-  app.post(
-    "/api/articles/:id/unsave",
-    requireAuth(),
-    async (req: any, res) => {
-      const result = await storage.unsaveArticle(req.params.id, req.auth.userId);
-      res.json(result);
-    }
-  );
+  app.post("/api/articles/:id/unsave", requireAuth(), async (req: any, res) => {
+    const result = await storage.unsaveArticle(req.params.id, req.auth.userId);
+    res.json(result);
+  });
 
   app.get("/api/saved-articles", requireAuth(), async (req: any, res) => {
     const articles = await storage.getSavedArticles(req.auth.userId);
@@ -127,25 +119,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ======================
-  // KEYWORDS (PUBLIC + PROTECTED)
+  // KEYWORDS (PROTECTED - per-user)
   // ======================
-  app.get("/api/keywords", async (_req, res) => {
-    res.json(await storage.getKeywords());
+  app.get("/api/keywords", async (req: any, res) => {
+    const { userId } = getAuth(req);
+    res.json(await storage.getKeywords(userId || undefined));
   });
 
   // NOTE: This is used by the UI: /api/keywords/blocked, /api/keywords/prioritized
-  app.get("/api/keywords/:type", async (req, res) => {
-    res.json(await storage.getKeywordsByType(req.params.type));
+  app.get("/api/keywords/:type", async (req: any, res) => {
+    const { userId } = getAuth(req);
+    res.json(await storage.getKeywordsByType(req.params.type, userId || undefined));
   });
 
   app.post("/api/keywords", requireAuth(), async (req: any, res) => {
     try {
-      const keyword = await storage.createKeyword(
-        insertKeywordSchema.parse({
-          ...req.body,
-          userId: req.auth.userId,
-        })
-      );
+      const parsed = insertKeywordSchema.parse(req.body);
+      const keyword = await storage.createKeyword({
+        ...parsed,
+        userId: req.auth.userId,
+      });
       res.json(keyword);
     } catch (error) {
       console.error("Error creating keyword:", error);
@@ -169,29 +162,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ success: true, id: keywordId });
     } catch (error) {
       console.error("Error deleting keyword:", error);
-      res.status(500).json({ message: "Failed to delete keyword" });
-    }
-  });
-
-  /**
-   * ✅ DELETE ALIAS (backup)
-   * This uses the *same path pattern* as GET /api/keywords/:type
-   * but treats the param as an ID when the method is DELETE.
-   * This removes any ambiguity in environments where param-route registration
-   * behaves unexpectedly.
-   */
-  app.delete("/api/keywords/:type", requireAuth(), async (req: any, res) => {
-    try {
-      const keywordId = req.params.type; // yes: param name is "type", but for DELETE it’s actually the ID
-      const ok = await storage.deleteKeyword(keywordId);
-
-      if (!ok) {
-        return res.status(404).json({ message: "Keyword not found" });
-      }
-
-      res.json({ success: true, id: keywordId });
-    } catch (error) {
-      console.error("Error deleting keyword (alias):", error);
       res.status(500).json({ message: "Failed to delete keyword" });
     }
   });
@@ -225,13 +195,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const ok = await storage.deleteReplacementPattern(patternId);
 
         if (!ok) {
-          return res.status(404).json({ message: "Replacement pattern not found" });
+          return res
+            .status(404)
+            .json({ message: "Replacement pattern not found" });
         }
 
         res.json({ success: true, id: patternId });
       } catch (error) {
         console.error("Error deleting replacement pattern:", error);
-        res.status(500).json({ message: "Failed to delete replacement pattern" });
+        res
+          .status(500)
+          .json({ message: "Failed to delete replacement pattern" });
       }
     }
   );
