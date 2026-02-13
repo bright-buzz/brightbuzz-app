@@ -9,10 +9,18 @@ const app = express();
 // ✅ CORS: allow Vercel frontend to call this Render backend
 app.use(
   cors({
-    origin: ["https://brightbuzz.vercel.app"],
+    origin: [
+      "https://brightbuzz.vercel.app",
+      "https://getbrightbuzz.com", // add if you’re using custom domain
+    ],
     credentials: true,
+    allowedHeaders: ["Content-Type", "Authorization"],
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   })
 );
+
+// ✅ Explicitly handle preflight requests
+app.options("*", cors());
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
@@ -36,8 +44,8 @@ app.use((req, res, next) => {
       if (capturedJsonResponse) {
         logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
       }
-      if (logLine.length > 100) {
-        logLine = logLine.slice(0, 99) + "…";
+      if (logLine.length > 200) {
+        logLine = logLine.slice(0, 199) + "…";
       }
       log(logLine);
     }
