@@ -9,20 +9,31 @@ async function throwIfResNotOk(res: Response) {
 
 /**
  * API base URL
- * - In production: set VITE_API_URL to your Render backend URL (e.g. https://your-service.onrender.com)
- * - In local dev: you can omit it and it will use same-origin (proxy/dev server if you have one)
+ * - In production: set VITE_API_URL to your Render backend URL
+ * - In local dev: omit it for same-origin
  */
 const API_BASE_URL =
   (import.meta as any).env?.VITE_API_URL?.replace(/\/$/, "") || "";
 
-/**
- * Prefix /api/... routes with the configured API base URL.
- * If API_BASE_URL is empty, it falls back to same-origin.
- */
 function withApiBase(url: string) {
   if (!url.startsWith("/")) return url;
   if (!API_BASE_URL) return url;
   return `${API_BASE_URL}${url}`;
+}
+
+/**
+ * Get Clerk session token for API requests.
+ */
+async function getAuthToken(): Promise<string | null> {
+  try {
+    if (typeof window !== "undefined" && (window as any).Clerk) {
+      const token = await (window as any).Clerk.session?.getToken();
+      return token || null;
+    }
+    return null;
+  } catch {
+    return null;
+  }
 }
 
 export async function apiRequest(
@@ -31,10 +42,15 @@ export async function apiRequest(
   data?: unknown | undefined
 ): Promise<Response> {
   const fullUrl = withApiBase(url);
+  const token = await getAuthToken();
+
+  const headers: Record<string, string> = {};
+  if (data) headers["Content-Type"] = "application/json";
+  if (token) headers["Authorization"] = `Bearer ${token}`;
 
   const res = await fetch(fullUrl, {
     method,
-    headers: data ? { "Content-Type": "application/json" } : {},
+    headers,
     body: data ? JSON.stringify(data) : undefined,
     credentials: "include",
   });
@@ -52,8 +68,13 @@ export const getQueryFn: <T>(options: {
   async ({ queryKey }) => {
     const rawUrl = queryKey.join("/") as string;
     const fullUrl = withApiBase(rawUrl);
+    const token = await getAuthToken();
+
+    const headers: Record<string, string> = {};
+    if (token) headers["Authorization"] = `Bearer ${token}`;
 
     const res = await fetch(fullUrl, {
+      headers,
       credentials: "include",
     });
 
