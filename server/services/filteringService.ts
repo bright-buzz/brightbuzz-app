@@ -30,8 +30,8 @@ export async function fetchUserFilterConfig(userId?: string): Promise<FilterConf
     replacementPatternsList,
     preferences
   ] = await Promise.all([
-    storage.getKeywordsByType('blocked'),
-    storage.getKeywordsByType('prioritized'),
+    storage.getKeywordsByType('blocked', userId),
+    storage.getKeywordsByType('prioritized', userId),
     userId ? storage.getReplacementPatterns(userId) : Promise.resolve([]),
     storage.getUserPreferences(userId)
   ]);
